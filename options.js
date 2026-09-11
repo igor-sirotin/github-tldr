@@ -1,6 +1,6 @@
 const DEFAULTS = {
   openaiKey: '',
-  openaiModel: 'gpt-4o-mini',
+  openaiModel: 'gpt-5.6-luna',
   openaiBaseUrl: 'https://api.openai.com/v1',
 };
 

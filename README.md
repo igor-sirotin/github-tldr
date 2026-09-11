@@ -18,7 +18,7 @@ Open the extension's options page (or its service worker console from
 
 ```js
 chrome.storage.local.set({ openaiKey: 'sk-...' })            // key
-chrome.storage.local.set({ openaiModel: 'gpt-4o-mini' })     // optional
+chrome.storage.local.set({ openaiModel: 'gpt-5.6-luna' })    // optional
 chrome.storage.local.set({ openaiBaseUrl: 'https://api.openai.com/v1' }) // optional
 ```
 
@@ -36,6 +36,20 @@ scripts on github.com.
   `POST {baseUrl}/chat/completions`, returning the summary to the content script.
 - Comments shorter than 120 characters get no button; comment text is truncated
   to 12k characters before being sent.
+
+## Model choice
+
+The default is `gpt-5.6-luna` — the cheap tier of the current generation, at
+$0.20/1M input and $1.20/1M output. A typical comment costs well under a tenth
+of a cent to summarize, so model choice here is about output quality, not spend.
+`reasoning_effort` is pinned to `none`: summarizing needs no deliberation, and
+that keeps both latency and billed reasoning tokens down.
+
+Any OpenAI-compatible model works — set it in the options. Parameter differences
+between model families are handled automatically: if the API rejects
+`temperature`, `max_tokens` or `reasoning_effort` for the chosen model, the
+request is rebuilt without it (swapping in `max_completion_tokens` where needed)
+and retried, and the result is remembered for later calls.
 
 Clicking **TLDR** again hides/shows the existing summary — it does not re-bill a
 second request.
