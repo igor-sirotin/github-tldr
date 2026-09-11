@@ -59,10 +59,42 @@ second request.
 | File | Purpose |
 | --- | --- |
 | `manifest.json` | MV3 manifest, `github.com` content script, `api.openai.com` host permission |
-| `content.js` | Button injection, panel rendering |
+| `content.js` | Button injection, wand icon, panel rendering |
+| `preview.html` | Standalone design preview, no extension install needed |
 | `content.css` | Styles, themed with GitHub's CSS variables (works in dark mode) |
 | `background.js` | OpenAI request |
 | `options.html` / `options.js` | Key, model and base URL settings |
+
+## Previewing the button without installing
+
+Open `preview.html` in a browser — no extension loading, no build step, no server:
+
+```sh
+xdg-open preview.html    # or just double-click it
+```
+
+It loads the extension's real `content.css` and `content.js` and stubs only the
+OpenAI call, so the button you see is the one that ships. There are mock comments
+in both GitHub layouts, a dark-mode toggle, and one comment wired to the error
+path. Hover the button to spin the stroke; click it for the loading and result
+states.
+
+## Button styling
+
+The **TLDR** button carries [lucide.dev](https://lucide.dev)'s `wand-sparkles`
+icon, inlined as SVG built with `createElementNS` (no `innerHTML`, so it is
+CSP-safe) and stroked with `currentColor` so it follows the GitHub theme.
+
+Its multi-colored stroke is a `conic-gradient` on a `::before` pseudo-element,
+masked with `mask-composite: exclude` down to a 1px ring — which leaves the
+button's interior transparent, so it sits on any GitHub background. The gradient
+rotates by animating an `@property`-registered `--gh-tldr-angle`, which is what
+makes an angle animatable at all.
+
+The ring only animates on `:hover` and while a summary is loading — a page with
+forty comments should not shimmer. To make it always spin, move the `animation`
+line out of the `:hover, .is-loading` rule in `content.css` and into
+`.gh-tldr-btn::before`. `prefers-reduced-motion` disables it either way.
 
 ## Tests
 
@@ -74,4 +106,8 @@ stubs `fetch` and checks request shaping and error handling.
 npm install jsdom      # only dependency, only needed for the DOM test
 node test/content.test.js
 node test/background.test.js
+node test/preview.test.js
 ```
+
+`preview.test.js` loads `preview.html` the way a browser would, so the preview
+page can't silently rot as the content script changes.

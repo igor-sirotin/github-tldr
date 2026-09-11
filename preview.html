@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en" data-preview-theme="light">
+<head>
+<meta charset="utf-8" />
+<title>GitHub TLDR — button preview</title>
+<!-- The real stylesheet. Nothing here re-implements it. -->
+<link rel="stylesheet" href="content.css" />
+<style>
+  /* A stand-in for the GitHub theme variables content.css reads. */
+  html[data-preview-theme="light"] {
+    --bgColor-default: #ffffff;
+    --bgColor-muted: #f6f8fa;
+    --borderColor-default: #d0d7de;
+    --fgColor-default: #1f2328;
+    --fgColor-muted: #656d76;
+    --fgColor-accent: #0969da;
+    --fgColor-danger: #cf222e;
+  }
+  html[data-preview-theme="dark"] {
+    --bgColor-default: #0d1117;
+    --bgColor-muted: #151b23;
+    --borderColor-default: #3d444d;
+    --fgColor-default: #f0f6fc;
+    --fgColor-muted: #9198a1;
+    --fgColor-accent: #4493f8;
+    --fgColor-danger: #f85149;
+  }
+
+  body {
+    margin: 0;
+    padding: 24px;
+    background: var(--bgColor-default);
+    color: var(--fgColor-default);
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  main { max-width: 780px; margin: 0 auto; }
+  h1 { font-size: 16px; margin: 0 0 4px; }
+  .note { color: var(--fgColor-muted); font-size: 13px; margin: 0 0 20px; }
+  .toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 20px; flex-wrap: wrap; }
+  .toolbar button {
+    font: 600 12px/20px inherit; padding: 3px 10px; cursor: pointer;
+    color: var(--fgColor-default); background: var(--bgColor-muted);
+    border: 1px solid var(--borderColor-default); border-radius: 6px;
+  }
+  .toolbar .lag { color: var(--fgColor-muted); font-size: 12px; }
+
+  /* Roughly GitHub's comment box, enough for the button to sit in context. */
+  .js-comment-container, [data-testid="comment-viewer-outer-box"] {
+    border: 1px solid var(--borderColor-default);
+    border-radius: 6px;
+    margin-bottom: 18px;
+    background: var(--bgColor-default);
+    overflow: hidden;
+  }
+  .timeline-comment-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 16px; background: var(--bgColor-muted);
+    border-bottom: 1px solid var(--borderColor-default);
+    font-size: 13px; color: var(--fgColor-muted);
+  }
+  .timeline-comment-actions { display: flex; align-items: center; }
+  .timeline-comment-actions .more { color: var(--fgColor-muted); }
+  .comment-body, [data-testid="comment-body"] { padding: 14px 16px; }
+  .comment-body p { margin: 0 0 10px; }
+  .comment-body p:last-child { margin-bottom: 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>GitHub TLDR — button preview</h1>
+  <p class="note">
+    This page loads the extension's real <code>content.css</code> and
+    <code>content.js</code>; only the OpenAI call is stubbed. Hover the button to
+    spin the gradient stroke, click it to watch the loading and result states.
+  </p>
+
+  <div class="toolbar">
+    <button id="theme">Toggle dark mode</button>
+    <button id="reset">Reset panels</button>
+    <span class="lag">Stubbed response delay: 900ms</span>
+  </div>
+
+  <!-- Classic timeline comment: button goes into the header action bar. -->
+  <div class="js-comment-container">
+    <div class="timeline-comment-header">
+      <span><strong>octocat</strong> commented 2 hours ago</span>
+      <div class="timeline-comment-actions"><span class="more">···</span></div>
+    </div>
+    <div class="comment-body js-comment-body">
+      <p>I've been digging into the flaky integration test and I think the root cause is
+      the shared fixture database. When two workers run in parallel they both truncate
+      the tables between cases, so whichever one is mid-transaction sees rows vanish
+      underneath it.</p>
+      <p>Proposal: give each worker its own schema and point the connection string at it.
+      That's about a day of work and it should let us drop the retry wrapper entirely.
+      Any objections before I start?</p>
+    </div>
+  </div>
+
+  <!-- React issue view: no action bar, so the button gets its own row. -->
+  <div data-testid="comment-viewer-outer-box">
+    <div data-testid="comment-body">
+      <p>Sounds right to me. One caveat — the migration runner assumes a single schema
+      today, so it will need a flag before per-worker schemas will actually build. I hit
+      exactly this on the reporting service last quarter and it took longer than a day,
+      closer to three, mostly because of the seed data.</p>
+      <p>FAIL: this comment is wired to the stubbed error path, to show the failure state.</p>
+    </div>
+  </div>
+</main>
+
+<script>
+  // Minimal stand-in for the extension APIs content.js expects.
+  window.chrome = {
+    runtime: {
+      sendMessage(msg) {
+        return new Promise((resolve) => {
+          setTimeout(() => {
+            if (/FAIL/.test(msg.text)) {
+              resolve({ error: 'No OpenAI API key set. Open the extension options and add one.' });
+              return;
+            }
+            resolve({
+              summary: [
+                '- Flaky integration test traced to the shared fixture database: parallel workers truncate tables mid-transaction.',
+                '- Proposes one schema per worker, about a day of work, which would remove the retry wrapper.',
+                '- Asking for objections before starting.',
+              ].join('\n'),
+            });
+          }, 900);
+        });
+      },
+    },
+  };
+
+  document.getElementById('theme').addEventListener('click', () => {
+    const root = document.documentElement;
+    root.dataset.previewTheme = root.dataset.previewTheme === 'dark' ? 'light' : 'dark';
+  });
+
+  document.getElementById('reset').addEventListener('click', () => {
+    for (const panel of document.querySelectorAll('.gh-tldr-panel')) {
+      panel.hidden = true;
+      panel.dataset.loaded = '0';
+      panel.textContent = '';
+    }
+  });
+</script>
+<!-- The real content script, loaded unmodified. -->
+<script src="content.js"></script>
+</body>
+</html>

@@ -13,6 +13,20 @@ const ACTION_SELECTORS = [
   '.js-comment-header-actions',
 ];
 
+// lucide.dev "wand-sparkles", stroked with currentColor.
+const WAND_PATHS = [
+  'm21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72',
+  'm14 7 3 3',
+  'M5 6v4',
+  'M19 14v4',
+  'M10 2v2',
+  'M7 8H3',
+  'M21 16h-4',
+  'M11 3H9',
+];
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
 const PROCESSED = 'data-tldr-ready';
 const MIN_CHARS = 120; // shorter comments don't need a TLDR
 
@@ -32,12 +46,36 @@ function commentContainerOf(body) {
   );
 }
 
+function wandIcon() {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('width', '13');
+  svg.setAttribute('height', '13');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '2');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.classList.add('gh-tldr-icon');
+  for (const d of WAND_PATHS) {
+    const path = document.createElementNS(SVG_NS, 'path');
+    path.setAttribute('d', d);
+    svg.appendChild(path);
+  }
+  return svg;
+}
+
 function makeButton() {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'gh-tldr-btn';
-  btn.textContent = 'TLDR';
   btn.title = 'Summarize this comment with AI';
+  btn.appendChild(wandIcon());
+  const label = document.createElement('span');
+  label.className = 'gh-tldr-label';
+  label.textContent = 'TLDR';
+  btn.appendChild(label);
   return btn;
 }
 

@@ -35,6 +35,10 @@ const assert = (cond, msg) => { if (!cond) { console.error('FAIL:', msg); proces
 const btns = doc.querySelectorAll('.gh-tldr-btn');
 assert(btns.length === 2, `button injected on both long comments, skipped the short one (got ${btns.length})`);
 assert(doc.querySelector('.timeline-comment-actions .gh-tldr-btn'), 'classic comment: button lands in the action bar');
+assert(btns[0].querySelector('svg.gh-tldr-icon'), 'button carries the wand icon');
+assert(btns[0].querySelectorAll('svg.gh-tldr-icon path').length === 8, 'icon has all 8 lucide wand-sparkles paths');
+assert(btns[0].querySelector('svg.gh-tldr-icon').namespaceURI === 'http://www.w3.org/2000/svg', 'icon built in the SVG namespace');
+assert(btns[0].querySelector('.gh-tldr-label').textContent === 'TLDR', 'button still reads TLDR');
 assert(doc.querySelector('[data-testid="comment-viewer-outer-box"] .gh-tldr-bar .gh-tldr-btn'), 'react comment: button falls back to its own bar');
 
 (async () => {
