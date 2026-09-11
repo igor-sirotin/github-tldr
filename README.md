@@ -59,11 +59,11 @@ second request.
 | File | Purpose |
 | --- | --- |
 | `manifest.json` | MV3 manifest, `github.com` content script, `api.openai.com` host permission |
-| `content.js` | Button injection, wand icon, panel rendering |
+| `content.js` | Button injection, wand icon, panel rendering, cache peek |
 | `preview.html` | Standalone design preview, no extension install needed |
 | `content.css` | Styles, themed with GitHub's CSS variables (works in dark mode) |
-| `background.js` | OpenAI request |
-| `options.html` / `options.js` | Key, model and base URL settings |
+| `background.js` | OpenAI request, summary cache |
+| `options.html` / `options.js` | Key, model and base URL settings, cache size and clear |
 
 ## Previewing the button without installing
 
@@ -74,27 +74,55 @@ xdg-open preview.html    # or just double-click it
 ```
 
 It loads the extension's real `content.css` and `content.js` and stubs only the
-OpenAI call, so the button you see is the one that ships. There are mock comments
-in both GitHub layouts, a dark-mode toggle, and one comment wired to the error
-path. Hover the button to spin the stroke; click it for the loading and result
-states.
+extension APIs, so the button you see is the one that ships. There is a button
+states row (idle and loading side by side), three mock comments, and a theme
+toggle. The stub fails every second call so the error state is reachable, and
+the third comment is pre-seeded in the stub's cache so it opens on load without
+a click — press **Clear cache** to put it back.
 
 ## Button styling
 
+`content.css` is the design handed off in the **GitHub TLDR extension design**
+Claude Design project, applied verbatim.
+
 The **TLDR** button carries [lucide.dev](https://lucide.dev)'s `wand-sparkles`
-icon, inlined as SVG built with `createElementNS` (no `innerHTML`, so it is
-CSP-safe) and stroked with `currentColor` so it follows the GitHub theme.
+icon, stroked with `currentColor` so it follows the GitHub theme. It is built
+with `createElementNS` rather than assigned as an `innerHTML` string, which is
+the one deliberate deviation from the handoff's `content.js`; the rendered
+result is identical.
 
-Its multi-colored stroke is a `conic-gradient` on a `::before` pseudo-element,
-masked with `mask-composite: exclude` down to a 1px ring — which leaves the
-button's interior transparent, so it sits on any GitHub background. The gradient
-rotates by animating an `@property`-registered `--gh-tldr-angle`, which is what
-makes an angle animatable at all.
+The gradient stroke is a two-layer background — a flat surface layer clipped to
+`padding-box` over a `#0969da → #8250df → #bf3989 → #bc4c00 → #1a7f37` gradient
+clipped to `border-box`, all GitHub's own accent hues. The `gh-tldr-sheen`
+animation slides that second layer, 7s at rest, 2.2s on hover, 1.4s while
+loading, where the wand also waves ±12°. The surface layer reads
+`--gh-tldr-surface` so the button stays legible in dark mode.
 
-The ring only animates on `:hover` and while a summary is loading — a page with
-forty comments should not shimmer. To make it always spin, move the `animation`
-line out of the `:hover, .is-loading` rule in `content.css` and into
-`.gh-tldr-btn::before`. `prefers-reduced-motion` disables it either way.
+The panel drops the old blue left border for a 1px box with a static 2px
+gradient hairline along the top — deliberately still, so the result does not
+compete with the control — a mono uppercase title and custom 4px bullet dots.
+
+`prefers-reduced-motion` disables the sheen and the wave. Per the handoff's open
+question, the sheen currently runs whenever a button is on screen; to restrict it
+to hover, move `animation: gh-tldr-sheen …` from `.gh-tldr-btn` into
+`.gh-tldr-btn:hover:not(:disabled)`.
+
+## Caching
+
+A summary is reused rather than re-bought. When the content script attaches to a
+comment it sends a `peek` message; a hit renders the panel immediately, titled
+`TLDR · cached`, with no click and no API call. A miss leaves the panel closed.
+
+The cache key is a hash of the model and the exact comment text that was sent to
+the API. **That is the version check.** Comments are editable, and an edit moves
+the hash, so the old entry is simply never looked up again — there is no
+revision number to track and no way to show a summary of text that no longer
+exists. Switching models also misses, rather than reusing another model's output.
+
+Entries live in `chrome.storage.local` under `tldrCache`, capped at 200 with the
+oldest evicted first. Writes are serialized, because several comments can finish
+at once and a plain read-modify-write would drop entries. A failed cache write
+never fails the summary. The options page shows the entry count and clears it.
 
 ## Tests
 

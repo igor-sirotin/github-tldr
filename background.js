@@ -32,7 +32,7 @@ function buildBody(model, text) {
     model,
     messages: [
       { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: text.slice(0, MAX_CHARS) },
+      { role: 'user', content: sentText(text) },
     ],
   };
   // Summarizing needs no deliberation; 'none' keeps latency and billed
@@ -55,6 +55,61 @@ function droppableParam(error) {
   return unsupportedish ? param : null;
 }
 
+const CACHE_KEY = 'tldrCache';
+const CACHE_LIMIT = 200; // entries; oldest are dropped first
+
+// Cache entries are keyed by a hash of the model plus the exact comment text
+// that was sent. That is the version check: edit a comment and the hash moves,
+// so the old entry is simply never looked up again. No separate revision field
+// to keep in sync, and no way to show a summary of text that no longer exists.
+function cacheKey(model, payload) {
+  let h = 5381;
+  for (let i = 0; i < payload.length; i += 1) {
+    h = ((h << 5) + h + payload.charCodeAt(i)) | 0;
+  }
+  const tag = String(model).replace(/[^a-z0-9.\-]/gi, '');
+  return `${tag}:${(h >>> 0).toString(36)}:${payload.length}`;
+}
+
+// What actually goes to the API, and therefore what the key must cover.
+function sentText(text) {
+  return text.slice(0, MAX_CHARS);
+}
+
+async function readCache() {
+  const stored = await chrome.storage.local.get(CACHE_KEY);
+  const cache = stored[CACHE_KEY];
+  return cache && typeof cache === 'object' ? cache : {};
+}
+
+// Several comments can finish at once, and a bare read-modify-write would let
+// the last writer drop the others. Serialize them.
+let writes = Promise.resolve();
+function writeCache(key, summary) {
+  writes = writes
+    .then(async () => {
+      const cache = await readCache();
+      cache[key] = { summary, at: Date.now() };
+      const keys = Object.keys(cache);
+      if (keys.length > CACHE_LIMIT) {
+        keys.sort((a, b) => (cache[a].at || 0) - (cache[b].at || 0));
+        for (const stale of keys.slice(0, keys.length - CACHE_LIMIT)) delete cache[stale];
+      }
+      await chrome.storage.local.set({ [CACHE_KEY]: cache });
+    })
+    .catch(() => {}); // a failed cache write must not fail the summary
+  return writes;
+}
+
+// Look up without ever calling the API — this runs for every comment on the
+// page, so it must stay free.
+async function peek(text) {
+  const { openaiModel } = await getSettings();
+  const cache = await readCache();
+  const hit = cache[cacheKey(openaiModel, sentText(text))];
+  return hit ? hit.summary : null;
+}
+
 async function getSettings() {
   const stored = await chrome.storage.local.get(['openaiKey', 'openaiModel', 'openaiBaseUrl']);
   return { ...DEFAULTS, ...stored };
@@ -65,6 +120,10 @@ async function tldr(text) {
   if (!openaiKey) {
     throw new Error('No OpenAI API key set. Open the extension options and add one.');
   }
+
+  const key = cacheKey(openaiModel, sentText(text));
+  const cache = await readCache();
+  if (cache[key]) return cache[key].summary;
 
   const url = `${openaiBaseUrl.replace(/\/+$/, '')}/chat/completions`;
   let data = null;
@@ -108,10 +167,18 @@ async function tldr(text) {
         : 'Empty response from OpenAI.'
     );
   }
+  await writeCache(key, summary);
   return summary;
 }
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg?.type === 'peek') {
+    peek(msg.text)
+      .then((summary) => sendResponse(summary ? { summary, cached: true } : {}))
+      .catch(() => sendResponse({}));
+    return true;
+  }
+
   if (msg?.type !== 'tldr') return;
   tldr(msg.text)
     .then((summary) => sendResponse({ summary }))

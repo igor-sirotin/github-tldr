@@ -13,9 +13,10 @@ const ACTION_SELECTORS = [
   '.js-comment-header-actions',
 ];
 
-// lucide.dev "wand-sparkles", stroked with currentColor.
+// Lucide "wand-sparkles" (https://lucide.dev/icons/wand-sparkles), ISC licensed.
+// Built as nodes rather than an innerHTML string; sized by .gh-tldr-wand in CSS.
 const WAND_PATHS = [
-  'm21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72',
+  'm21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72Z',
   'm14 7 3 3',
   'M5 6v4',
   'M19 14v4',
@@ -49,15 +50,13 @@ function commentContainerOf(body) {
 function wandIcon() {
   const svg = document.createElementNS(SVG_NS, 'svg');
   svg.setAttribute('viewBox', '0 0 24 24');
-  svg.setAttribute('width', '13');
-  svg.setAttribute('height', '13');
   svg.setAttribute('fill', 'none');
   svg.setAttribute('stroke', 'currentColor');
   svg.setAttribute('stroke-width', '2');
   svg.setAttribute('stroke-linecap', 'round');
   svg.setAttribute('stroke-linejoin', 'round');
   svg.setAttribute('aria-hidden', 'true');
-  svg.classList.add('gh-tldr-icon');
+  svg.classList.add('gh-tldr-wand');
   for (const d of WAND_PATHS) {
     const path = document.createElementNS(SVG_NS, 'path');
     path.setAttribute('d', d);
@@ -86,11 +85,12 @@ function makePanel() {
   return panel;
 }
 
-function renderSummary(panel, text) {
+function renderSummary(panel, text, { cached = false } = {}) {
   panel.textContent = '';
   const title = document.createElement('div');
   title.className = 'gh-tldr-title';
-  title.textContent = 'TLDR';
+  // Say where it came from, so a summary that appears unprompted is explained.
+  title.textContent = cached ? 'TLDR · cached' : 'TLDR';
   panel.appendChild(title);
 
   const list = text
@@ -177,6 +177,20 @@ function attach(body) {
   }
 
   body.parentElement.insertBefore(panel, body);
+
+  // If this exact comment text was summarized before, show it straight away.
+  // A miss (including an edited comment, whose text now hashes differently)
+  // leaves the panel closed and costs nothing.
+  chrome.runtime
+    .sendMessage({ type: 'peek', text: textOf(body) })
+    .then((res) => {
+      if (!res || !res.summary || panel.dataset.loaded === '1') return;
+      panel.hidden = false;
+      panel.className = 'gh-tldr-panel';
+      renderSummary(panel, res.summary, { cached: true });
+      panel.dataset.loaded = '1';
+    })
+    .catch(() => {}); // no background worker (or no cache) is not an error
 
   btn.addEventListener('click', (e) => {
     e.preventDefault();

@@ -1,152 +1,200 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en" data-preview-theme="light">
 <head>
-<meta charset="utf-8" />
+<meta charset="utf-8">
 <title>GitHub TLDR — button preview</title>
-<!-- The real stylesheet. Nothing here re-implements it. -->
-<link rel="stylesheet" href="content.css" />
+<!-- The real extension stylesheet. Nothing here is loaded by the extension itself. -->
+<link rel="stylesheet" href="content.css">
 <style>
-  /* A stand-in for the GitHub theme variables content.css reads. */
-  html[data-preview-theme="light"] {
+  :root {
     --bgColor-default: #ffffff;
     --bgColor-muted: #f6f8fa;
+    --bgColor-neutral-muted: #f6f8fa;
     --borderColor-default: #d0d7de;
     --fgColor-default: #1f2328;
-    --fgColor-muted: #656d76;
+    --fgColor-muted: #59636e;
     --fgColor-accent: #0969da;
     --fgColor-danger: #cf222e;
   }
-  html[data-preview-theme="dark"] {
+  [data-preview-theme="dark"] {
     --bgColor-default: #0d1117;
     --bgColor-muted: #151b23;
+    --bgColor-neutral-muted: #262c36;
     --borderColor-default: #3d444d;
     --fgColor-default: #f0f6fc;
     --fgColor-muted: #9198a1;
     --fgColor-accent: #4493f8;
     --fgColor-danger: #f85149;
+    color-scheme: dark;
   }
-
   body {
     margin: 0;
-    padding: 24px;
-    background: var(--bgColor-default);
+    padding: 40px 24px 80px;
+    background: var(--bgColor-muted);
     color: var(--fgColor-default);
     font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
   }
-  main { max-width: 780px; margin: 0 auto; }
-  h1 { font-size: 16px; margin: 0 0 4px; }
-  .note { color: var(--fgColor-muted); font-size: 13px; margin: 0 0 20px; }
-  .toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 20px; flex-wrap: wrap; }
-  .toolbar button {
-    font: 600 12px/20px inherit; padding: 3px 10px; cursor: pointer;
-    color: var(--fgColor-default); background: var(--bgColor-muted);
-    border: 1px solid var(--borderColor-default); border-radius: 6px;
-  }
-  .toolbar .lag { color: var(--fgColor-muted); font-size: 12px; }
-
-  /* Roughly GitHub's comment box, enough for the button to sit in context. */
-  .js-comment-container, [data-testid="comment-viewer-outer-box"] {
+  .wrap { max-width: 760px; margin: 0 auto; display: grid; gap: 20px; }
+  .bar { display: flex; align-items: center; gap: 12px; }
+  .bar h1 { font: 600 14px/1.4 inherit; margin: 0; }
+  .bar p { margin: 0; color: var(--fgColor-muted); font-size: 12px; }
+  .bar button {
+    font: 500 12px/20px inherit;
+    color: var(--fgColor-default);
+    background: var(--bgColor-default);
     border: 1px solid var(--borderColor-default);
     border-radius: 6px;
-    margin-bottom: 18px;
+    padding: 2px 10px;
+    cursor: pointer;
+  }
+  .bar .spacer { margin-left: auto; }
+  .timeline-comment {
     background: var(--bgColor-default);
+    border: 1px solid var(--borderColor-default);
+    border-radius: 6px;
     overflow: hidden;
   }
   .timeline-comment-header {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 8px 16px; background: var(--bgColor-muted);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: var(--bgColor-muted);
     border-bottom: 1px solid var(--borderColor-default);
-    font-size: 13px; color: var(--fgColor-muted);
+    font-size: 12px;
+    color: var(--fgColor-muted);
   }
-  .timeline-comment-actions { display: flex; align-items: center; }
-  .timeline-comment-actions .more { color: var(--fgColor-muted); }
-  .comment-body, [data-testid="comment-body"] { padding: 14px 16px; }
-  .comment-body p { margin: 0 0 10px; }
-  .comment-body p:last-child { margin-bottom: 0; }
+  .timeline-comment-header strong { color: var(--fgColor-default); }
+  .timeline-comment-actions { display: flex; align-items: center; margin-left: auto; }
+  .js-comment-body { padding: 16px; display: grid; gap: 12px; }
+  .js-comment-body p { margin: 0; }
+  .js-comment-body code {
+    font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    background: var(--bgColor-neutral-muted);
+    border-radius: 4px;
+    padding: 1px 5px;
+  }
+  .states { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; padding: 16px; background: var(--bgColor-default); border: 1px solid var(--borderColor-default); border-radius: 6px; }
+  .states .label { font: 500 11px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--fgColor-muted); width: 100%; }
 </style>
 </head>
 <body>
-<main>
-  <h1>GitHub TLDR — button preview</h1>
-  <p class="note">
-    This page loads the extension's real <code>content.css</code> and
-    <code>content.js</code>; only the OpenAI call is stubbed. Hover the button to
-    spin the gradient stroke, click it to watch the loading and result states.
-  </p>
-
-  <div class="toolbar">
-    <button id="theme">Toggle dark mode</button>
-    <button id="reset">Reset panels</button>
-    <span class="lag">Stubbed response delay: 900ms</span>
+<div class="wrap">
+  <div class="bar">
+    <div>
+      <h1>GitHub TLDR — local preview</h1>
+      <p>Runs the real <code>content.js</code> and <code>content.css</code> against a fake comment. No extension install, no API key.</p>
+    </div>
+    <span class="spacer"></span>
+    <button type="button" id="clear">Clear cache</button>
+    <button type="button" id="theme">Toggle theme</button>
   </div>
 
-  <!-- Classic timeline comment: button goes into the header action bar. -->
-  <div class="js-comment-container">
+  <div class="states">
+    <span class="label">Button states</span>
+    <button type="button" class="gh-tldr-btn"><svg class="gh-tldr-wand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72Z"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg><span>TLDR</span></button>
+    <button type="button" class="gh-tldr-btn is-loading" disabled><svg class="gh-tldr-wand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72Z"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg><span>TLDR</span></button>
+  </div>
+
+  <div class="timeline-comment js-comment-container">
     <div class="timeline-comment-header">
-      <span><strong>octocat</strong> commented 2 hours ago</span>
-      <div class="timeline-comment-actions"><span class="more">···</span></div>
+      <strong>octocat</strong> commented on <span>2026-03-14</span>
+      <div class="timeline-comment-actions"></div>
     </div>
-    <div class="comment-body js-comment-body">
-      <p>I've been digging into the flaky integration test and I think the root cause is
-      the shared fixture database. When two workers run in parallel they both truncate
-      the tables between cases, so whichever one is mid-transaction sees rows vanish
-      underneath it.</p>
-      <p>Proposal: give each worker its own schema and point the connection string at it.
-      That's about a day of work and it should let us drop the retry wrapper entirely.
-      Any objections before I start?</p>
+    <div class="js-comment-body">
+      <p>I spent some time digging into why the incremental build regressed after we split the app into feature modules. The short version is that the module graph is fine, but every target re-emits the shared <code>Design</code> module's interface file, so downstream targets always look dirty to the build system.</p>
+      <p>Two options. We can stop re-emitting by pinning the interface output path per configuration, which is a two-line change but makes clean builds slightly slower. Or we can split <code>Design</code> into a tokens-only target that almost never changes and a components target that does — bigger change, but it fixes the underlying fan-out instead of hiding it.</p>
+      <p>I lean towards the second, since we will hit the same wall again when the iOS app lands. Happy to be talked out of it if someone has numbers.</p>
     </div>
   </div>
 
-  <!-- React issue view: no action bar, so the button gets its own row. -->
-  <div data-testid="comment-viewer-outer-box">
-    <div data-testid="comment-body">
-      <p>Sounds right to me. One caveat — the migration runner assumes a single schema
-      today, so it will need a flag before per-worker schemas will actually build. I hit
-      exactly this on the reporting service last quarter and it took longer than a day,
-      closer to three, mostly because of the seed data.</p>
-      <p>FAIL: this comment is wired to the stubbed error path, to show the failure state.</p>
+  <div class="timeline-comment js-comment-container">
+    <div class="timeline-comment-header">
+      <strong>monalisa</strong> commented on <span>2026-03-15</span>
+      <div class="timeline-comment-actions"></div>
+    </div>
+    <div class="js-comment-body">
+      <p>Agreed on the second option, but let's land the pinned output path first so the branch is usable this week. The split touches every import site and I would rather review that on its own. Also worth checking whether the CI cache key includes the configuration name — if it does not, we are paying for this twice on every merge queue run.</p>
+      <p>Try the error path in this preview by clicking the second comment's button: the stub fails on purpose.</p>
     </div>
   </div>
-</main>
+
+  <div class="timeline-comment js-comment-container">
+    <div class="timeline-comment-header">
+      <strong>hubot</strong> commented on <span>2026-03-16</span>
+      <div class="timeline-comment-actions"></div>
+    </div>
+    <div class="js-comment-body">
+      <p>PRESEEDED — this comment is already in the preview's stub cache, so its summary
+      appears on load without anyone pressing the button, titled "TLDR · cached". In the real
+      extension the key is a hash of the model and the comment text, so editing a comment
+      changes the hash, misses the cache, and leaves the panel closed until you ask again.</p>
+      <p>Press "Clear cache" above to watch it go back to needing a click.</p>
+    </div>
+  </div>
+</div>
 
 <script>
-  // Minimal stand-in for the extension APIs content.js expects.
+  // Minimal stand-in for the extension APIs content.js expects. The real cache
+  // lives in the service worker; here it is a Map, keyed the same way — by the
+  // comment text — so the behaviour on screen matches the shipping one.
+  let call = 0;
+  const cache = new Map();
+
+  const CANNED = [
+    '- Incremental builds regressed because the shared Design module re-emits its interface file, marking downstream targets dirty.',
+    '- Short fix: pin the interface output path per configuration — two lines, slightly slower clean builds.',
+    '- Preferred fix: split Design into tokens and components targets to remove the fan-out before the iOS app lands.',
+  ].join('\n');
+
+  const PRESEEDED = [
+    '- Already summarized earlier, so this panel opened on page load rather than on a click.',
+    '- The cache key is a hash of the model and the comment text, which doubles as the version check.',
+    '- Edit the comment and the hash moves, so the stale summary is never shown again.',
+  ].join('\n');
+
+  cache.set('PRESEEDED', PRESEEDED);
+
+  const keyFor = (text) => (/PRESEEDED/.test(text) ? 'PRESEEDED' : text.slice(0, 80));
+
   window.chrome = {
     runtime: {
-      sendMessage(msg) {
-        return new Promise((resolve) => {
+      sendMessage: (msg) =>
+        new Promise((resolve) => {
+          const key = keyFor(msg.text || '');
+
+          // peek must never "call the API" — it answers from the cache only.
+          if (msg.type === 'peek') {
+            resolve(cache.has(key) ? { summary: cache.get(key), cached: true } : {});
+            return;
+          }
+
+          const fail = ++call % 2 === 0; // every second click shows the error state
           setTimeout(() => {
-            if (/FAIL/.test(msg.text)) {
-              resolve({ error: 'No OpenAI API key set. Open the extension options and add one.' });
-              return;
-            }
-            resolve({
-              summary: [
-                '- Flaky integration test traced to the shared fixture database: parallel workers truncate tables mid-transaction.',
-                '- Proposes one schema per worker, about a day of work, which would remove the retry wrapper.',
-                '- Asking for objections before starting.',
-              ].join('\n'),
-            });
+            if (fail) return resolve({ error: 'OpenAI API key is not set.' });
+            cache.set(key, CANNED);
+            resolve({ summary: CANNED });
           }, 900);
-        });
-      },
+        }),
     },
   };
 
-  document.getElementById('theme').addEventListener('click', () => {
-    const root = document.documentElement;
-    root.dataset.previewTheme = root.dataset.previewTheme === 'dark' ? 'light' : 'dark';
-  });
-
-  document.getElementById('reset').addEventListener('click', () => {
+  // Empties the stub cache and closes every panel, so the buttons go back to
+  // needing a click — the state a first-time visitor to a thread sees.
+  document.getElementById('clear').addEventListener('click', () => {
+    cache.clear();
     for (const panel of document.querySelectorAll('.gh-tldr-panel')) {
       panel.hidden = true;
       panel.dataset.loaded = '0';
       panel.textContent = '';
     }
   });
+
+  document.getElementById('theme').addEventListener('click', () => {
+    const el = document.documentElement;
+    el.dataset.previewTheme = el.dataset.previewTheme === 'dark' ? 'light' : 'dark';
+  });
 </script>
-<!-- The real content script, loaded unmodified. -->
 <script src="content.js"></script>
 </body>
 </html>
