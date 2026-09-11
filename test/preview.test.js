@@ -13,14 +13,21 @@ JSDOM.fromURL(file, { runScripts: 'dangerously', resources: 'usable', pretendToB
 
     const injected = doc.querySelectorAll('.timeline-comment-actions .gh-tldr-btn');
     assert(injected.length === 3, `a button is injected into each of the three mock comments (got ${injected.length})`);
+
+    // The issue-view mock has no action bar; the button belongs in its header.
+    const issueBtn = doc.querySelector('[data-testid="issue-body"] .gh-tldr-btn');
+    assert(issueBtn && issueBtn.closest('[class*="ActivityHeader-module__activityHeader"]'),
+      'issue-view mock: button lands in the header');
+    assert(!doc.querySelector('[data-testid="issue-body"] .gh-tldr-bar'),
+      'issue-view mock: no fallback bar');
     assert(doc.querySelectorAll('.states .gh-tldr-btn').length === 2, 'the states row shows idle and loading buttons');
     assert(doc.querySelector('.states .gh-tldr-btn.is-loading[disabled]'), 'loading state button is present and disabled');
-    assert(doc.querySelectorAll('svg.gh-tldr-wand').length === 5, 'every button carries the wand icon');
+    assert(doc.querySelectorAll('svg.gh-tldr-wand').length === 6, 'every button carries the wand icon');
     assert(doc.querySelector('link[href="content.css"]'), 'preview links the real stylesheet');
 
     // The pre-seeded comment must be summarized on load, with no click.
     const panels = doc.querySelectorAll('.gh-tldr-panel');
-    const seeded = panels[panels.length - 1];
+    const seeded = doc.querySelectorAll('.js-comment-container .gh-tldr-panel')[2];
     assert(seeded && seeded.hidden === false, 'pre-cached comment opens its panel on load');
     assert(seeded.querySelector('.gh-tldr-title').textContent === 'TLDR · cached', 'and is labelled as cached');
     assert(seeded.querySelectorAll('.gh-tldr-list li').length === 3, 'cached summary renders its bullets');

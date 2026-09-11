@@ -22,7 +22,7 @@
     ) border-box;
   background-size: auto, 300% 100%;
   background-position: 0 0, 0 50%;
-  animation: gh-tldr-sheen 7s linear infinite;
+  animation: gh-tldr-sheen 35s linear infinite;
   transition: color 140ms cubic-bezier(.2,.8,.2,1);
 }
 
@@ -33,7 +33,7 @@
 .gh-tldr-btn:hover:not(:disabled) {
   --gh-tldr-surface: var(--bgColor-neutral-muted, #f6f8fa);
   color: var(--fgColor-default, #1f2328);
-  animation-duration: 2.2s;
+  animation-duration: 11s;
 }
 
 .gh-tldr-btn:active:not(:disabled) {
@@ -57,7 +57,7 @@
 
 .gh-tldr-btn.is-loading {
   color: var(--fgColor-muted, #656d76);
-  animation-duration: 1.4s;
+  animation-duration: 7s;
 }
 
 .gh-tldr-btn.is-loading .gh-tldr-wand {
@@ -68,6 +68,12 @@
 @keyframes gh-tldr-wave {
   0%, 100% { transform: rotate(-12deg); }
   50%      { transform: rotate(12deg); }
+}
+
+/* Placement only, no visual change: the React issue header is a flex row with
+   no action bar, so push the button to the trailing edge where controls sit. */
+.gh-tldr-btn--header {
+  margin-left: auto;
 }
 
 .gh-tldr-bar {

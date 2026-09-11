@@ -74,6 +74,18 @@
     border-radius: 4px;
     padding: 1px 5px;
   }
+  /* Mirrors the React issue view: a header row with no action bar of its own. */
+  .react-issue-body { background: var(--bgColor-default); border: 1px solid var(--borderColor-default); border-radius: 6px; overflow: hidden; }
+  .ActivityHeader-module__activityHeader__demo {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 16px; background: var(--bgColor-muted);
+    border-bottom: 1px solid var(--borderColor-default);
+    font-size: 12px; color: var(--fgColor-muted);
+  }
+  .ActivityHeader-module__activityHeader__demo strong { color: var(--fgColor-default); }
+  [data-testid="issue-body-viewer"] { padding: 16px; display: grid; gap: 12px; }
+  [data-testid="issue-body-viewer"] p { margin: 0; }
+
   .states { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; padding: 16px; background: var(--bgColor-default); border: 1px solid var(--borderColor-default); border-radius: 6px; }
   .states .label { font: 500 11px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--fgColor-muted); width: 100%; }
 </style>
@@ -130,6 +142,23 @@
       extension the key is a hash of the model and the comment text, so editing a comment
       changes the hash, misses the cache, and leaves the panel closed until you ask again.</p>
       <p>Press "Clear cache" above to watch it go back to needing a click.</p>
+    </div>
+  </div>
+  <div data-testid="issue-body" class="react-issue-body">
+    <h2 class="sr-only" hidden>Description</h2>
+    <div class="IssueBodyHeader-module__IssueBodyHeaderContainer__demo">
+      <div class="ActivityHeader-module__activityHeader__demo">
+        <strong>octocat</strong> opened this issue · Issue description (React view)
+      </div>
+    </div>
+    <div data-testid="issue-body-viewer">
+      <div data-testid="markdown-body" class="markdown-body">
+        <p>This block reproduces GitHub's React issue view, which has no comment action bar at
+        all — the header is a plain flex row. The button is appended to that header rather than
+        dropped into a strip above the text, which is what it used to do here.</p>
+        <p>The class names carry a build hash on the real site, so the content script matches the
+        stable module prefix instead of the full name.</p>
+      </div>
     </div>
   </div>
 </div>

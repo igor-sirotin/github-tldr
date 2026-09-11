@@ -91,6 +91,12 @@ with `createElementNS` rather than assigned as an `innerHTML` string, which is
 the one deliberate deviation from the handoff's `content.js`; the rendered
 result is identical.
 
+The sheen timings are the one deviation from the handoff, at explicit request:
+5x slower than specified (35s at rest, 11s hover, 7s loading, against the
+handoff's 7s / 2.2s / 1.4s), because the original read as distracting on a long
+thread. This is effectively an answer to the handoff's own open question. The
+wand wave is a rotation rather than a colour cycle and stays at 1s.
+
 The gradient stroke is a two-layer background — a flat surface layer clipped to
 `padding-box` over a `#0969da → #8250df → #bf3989 → #bc4c00 → #1a7f37` gradient
 clipped to `border-box`, all GitHub's own accent hues. The `gh-tldr-sheen`
@@ -102,10 +108,25 @@ The panel drops the old blue left border for a 1px box with a static 2px
 gradient hairline along the top — deliberately still, so the result does not
 compete with the control — a mono uppercase title and custom 4px bullet dots.
 
-`prefers-reduced-motion` disables the sheen and the wave. Per the handoff's open
-question, the sheen currently runs whenever a button is on screen; to restrict it
-to hover, move `animation: gh-tldr-sheen …` from `.gh-tldr-btn` into
-`.gh-tldr-btn:hover:not(:disabled)`.
+`prefers-reduced-motion` disables the sheen and the wave. The sheen runs whenever
+a button is on screen; to restrict it to hover, move `animation: gh-tldr-sheen …`
+from `.gh-tldr-btn` into `.gh-tldr-btn:hover:not(:disabled)`.
+
+## Where the button is placed
+
+Three strategies, in order:
+
+1. **An action bar** (`.timeline-comment-actions` and friends) — classic timeline
+   comments and pull requests. The button is prepended, ahead of the existing
+   controls.
+2. **A bare header** — GitHub's React issue view ships *no* action bar for the
+   issue description, so the button is appended to the end of the header row and
+   right-aligned with `.gh-tldr-btn--header`. Those headers are CSS modules whose
+   class names carry a per-deploy build hash
+   (`ActivityHeader-module__activityHeader__ZGlyB`), so the selectors match the
+   stable module prefix with `[class*="…"]`, never the hash.
+3. **Its own row above the body** — the last resort, and previously what the
+   issue description incorrectly got.
 
 ## Caching
 

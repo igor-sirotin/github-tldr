@@ -7,10 +7,20 @@ const BODY_SELECTORS = [
   '[data-testid="markdown-body"]',
 ];
 
+// Action bars, where the button is prepended ahead of the existing controls.
 const ACTION_SELECTORS = [
   '.timeline-comment-actions',
   '[data-testid="comment-header-right-side-items"]',
   '.js-comment-header-actions',
+];
+
+// The React issue view ships no action bar at all — its header is a plain flex
+// row — so fall back to appending at the end of that header. These are CSS
+// module class names whose trailing hash changes on every GitHub deploy
+// (…__activityHeader__ZGlyB), hence the prefix match on the stable part.
+const HEADER_SELECTORS = [
+  '[class*="ActivityHeader-module__activityHeader"]',
+  '[class*="IssueBodyHeader-module__IssueBodyHeaderContainer"]',
 ];
 
 // Lucide "wand-sparkles" (https://lucide.dev/icons/wand-sparkles), ISC licensed.
@@ -43,6 +53,8 @@ function commentContainerOf(body) {
     body.closest('.timeline-comment') ||
     body.closest('[data-testid="comment-viewer-outer-box"]') ||
     body.closest('.react-issue-comment') ||
+    body.closest('[data-testid="issue-body"]') ||
+    body.closest('.react-issue-body') ||
     body.parentElement
   );
 }
@@ -161,15 +173,31 @@ function attach(body) {
   const btn = makeButton();
   const panel = makePanel();
 
-  let actions = null;
+  let placed = false;
+
   for (const sel of ACTION_SELECTORS) {
-    actions = container.querySelector(sel);
-    if (actions) break;
+    const actions = container.querySelector(sel);
+    if (actions) {
+      actions.insertBefore(btn, actions.firstChild);
+      placed = true;
+      break;
+    }
   }
 
-  if (actions) {
-    actions.insertBefore(btn, actions.firstChild);
-  } else {
+  if (!placed) {
+    for (const sel of HEADER_SELECTORS) {
+      const header = container.querySelector(sel);
+      if (header) {
+        btn.classList.add('gh-tldr-btn--header');
+        header.appendChild(btn);
+        placed = true;
+        break;
+      }
+    }
+  }
+
+  // Last resort: its own row above the body.
+  if (!placed) {
     const bar = document.createElement('div');
     bar.className = 'gh-tldr-bar';
     bar.appendChild(btn);

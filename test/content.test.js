@@ -5,6 +5,10 @@ const vm = require('vm');
 const SRC = require('path').join(__dirname, '..', 'content.js');
 const long = 'This is a long GitHub comment that definitely deserves a summary. '.repeat(4);
 
+// The issue-description markup mirrors what github.com actually serves for the
+// React issue view (data-testid and CSS-module class names taken from a fetched
+// issue page). The class hash is deliberately a different one from the live
+// page, to prove we match the module prefix and not the build hash.
 const dom = new JSDOM(`<!doctype html><body>
   <div class="js-comment-container">
     <div class="timeline-comment-header"><div class="timeline-comment-actions"><button>…</button></div></div>
@@ -15,6 +19,22 @@ const dom = new JSDOM(`<!doctype html><body>
   </div>
   <div class="js-comment-container">
     <div class="comment-body js-comment-body">too short</div>
+  </div>
+  <div data-testid="issue-body" class="react-issue-body IssueBody-module__innerContainer__xxxx">
+    <h2 class="sr-only">Description</h2>
+    <div class="IssueBody-module__headerRow__xxxx">
+      <div class="IssueBody-module__commentBorder__xxxx">
+        <div class="IssueBodyHeader-module__IssueBodyHeaderContainer__xxxx">
+          <div class="ActivityHeader-module__activityHeader__xxxx">
+            <div class="IssueBodyHeader-module__avatarContainer__xxxx"></div>
+            <div class="IssueBodyHeader-module__titleSection__xxxx"></div>
+          </div>
+        </div>
+        <div id="issue-body-viewer" data-testid="issue-body-viewer">
+          <div data-testid="markdown-body" class="markdown-body">${long}</div>
+        </div>
+      </div>
+    </div>
   </div>
 </body>`, { pretendToBeVisual: true, runScripts: 'outside-only' });
 
@@ -38,7 +58,7 @@ const doc = dom.window.document;
 const assert = (cond, msg) => { if (!cond) { console.error('FAIL:', msg); process.exitCode = 1; } else console.log('ok -', msg); };
 
 const btns = doc.querySelectorAll('.gh-tldr-btn');
-assert(btns.length === 2, `button injected on both long comments, skipped the short one (got ${btns.length})`);
+assert(btns.length === 3, `button injected on both long comments and the issue description, skipped the short one (got ${btns.length})`);
 assert(doc.querySelector('.timeline-comment-actions .gh-tldr-btn'), 'classic comment: button lands in the action bar');
 assert(btns[0].querySelector('svg.gh-tldr-wand'), 'button carries the wand icon with the design class');
 assert(btns[0].querySelectorAll('svg.gh-tldr-wand path').length === 8, 'icon has all 8 lucide wand-sparkles paths');
@@ -46,6 +66,22 @@ assert(btns[0].querySelector('svg.gh-tldr-wand').namespaceURI === 'http://www.w3
 assert(!btns[0].querySelector('svg').hasAttribute('width'), 'icon sized by CSS (14x14), not width attributes');
 assert(btns[0].querySelector('.gh-tldr-label').textContent === 'TLDR', 'button still reads TLDR');
 assert(doc.querySelector('[data-testid="comment-viewer-outer-box"] .gh-tldr-bar .gh-tldr-btn'), 'react comment: button falls back to its own bar');
+
+// The bug: on GitHub Issues the description has no action bar, so the button
+// used to land in a row above the body instead of up in the header.
+const issueBody = doc.querySelector('[data-testid="issue-body"]');
+const issueBtn = issueBody.querySelector('.gh-tldr-btn');
+assert(issueBtn, 'issue description gets a button');
+assert(
+  issueBtn.closest('[class*="ActivityHeader-module__activityHeader"]'),
+  'issue description: button sits in the header, not above the body'
+);
+assert(!issueBody.querySelector('.gh-tldr-bar'), 'issue description: no fallback bar is created');
+assert(issueBtn.classList.contains('gh-tldr-btn--header'), 'header placement marks the button so CSS can right-align it');
+assert(
+  issueBody.querySelector('[data-testid="issue-body-viewer"] .gh-tldr-panel'),
+  'issue description: panel still renders next to the body'
+);
 
 (async () => {
   const btn = btns[0];
@@ -55,7 +91,7 @@ assert(doc.querySelector('[data-testid="comment-viewer-outer-box"] .gh-tldr-bar 
   await new Promise((r) => setTimeout(r, 20));
 
   const tldrs = () => sent.filter((m) => m.type === 'tldr');
-  assert(sent.filter((m) => m.type === 'peek').length === 2, 'cache peeked once per comment on attach');
+  assert(sent.filter((m) => m.type === 'peek').length === 3, 'cache peeked once per comment on attach');
   assert(tldrs().length === 1, 'one tldr message sent to background');
   assert(tldrs()[0].text.includes('deserves a summary'), 'comment text forwarded');
   assert(panel.hidden === false, 'panel visible after summarizing');
