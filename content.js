@@ -1,0 +1,171 @@
+// GitHub TLDR - injects a "TLDR" button next to every GitHub comment.
+
+const BODY_SELECTORS = [
+  '.js-comment-body',
+  '.comment-body',
+  '[data-testid="comment-body"]',
+  '[data-testid="markdown-body"]',
+];
+
+const ACTION_SELECTORS = [
+  '.timeline-comment-actions',
+  '[data-testid="comment-header-right-side-items"]',
+  '.js-comment-header-actions',
+];
+
+const PROCESSED = 'data-tldr-ready';
+const MIN_CHARS = 120; // shorter comments don't need a TLDR
+
+// innerText gives the rendered text (collapsed details, hidden nodes dropped);
+// textContent is the fallback where innerText isn't implemented.
+function textOf(el) {
+  return (el.innerText ?? el.textContent ?? '').trim();
+}
+
+function commentContainerOf(body) {
+  return (
+    body.closest('.js-comment-container') ||
+    body.closest('.timeline-comment') ||
+    body.closest('[data-testid="comment-viewer-outer-box"]') ||
+    body.closest('.react-issue-comment') ||
+    body.parentElement
+  );
+}
+
+function makeButton() {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'gh-tldr-btn';
+  btn.textContent = 'TLDR';
+  btn.title = 'Summarize this comment with AI';
+  return btn;
+}
+
+function makePanel() {
+  const panel = document.createElement('div');
+  panel.className = 'gh-tldr-panel';
+  panel.hidden = true;
+  return panel;
+}
+
+function renderSummary(panel, text) {
+  panel.textContent = '';
+  const title = document.createElement('div');
+  title.className = 'gh-tldr-title';
+  title.textContent = 'TLDR';
+  panel.appendChild(title);
+
+  const list = text
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  const looksLikeList = list.length > 1 && list.every((l) => /^([-*•]|\d+[.)])\s+/.test(l));
+  if (looksLikeList) {
+    const ul = document.createElement('ul');
+    ul.className = 'gh-tldr-list';
+    for (const item of list) {
+      const li = document.createElement('li');
+      li.textContent = item.replace(/^([-*•]|\d+[.)])\s+/, '');
+      ul.appendChild(li);
+    }
+    panel.appendChild(ul);
+  } else {
+    const p = document.createElement('div');
+    p.className = 'gh-tldr-text';
+    p.textContent = list.join('\n');
+    panel.appendChild(p);
+  }
+}
+
+function setState(panel, cls, text) {
+  panel.hidden = false;
+  panel.className = `gh-tldr-panel ${cls}`;
+  panel.textContent = text;
+}
+
+async function summarize(btn, panel, body) {
+  const text = textOf(body);
+  if (!text) {
+    setState(panel, 'gh-tldr-error', 'Nothing to summarize.');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.classList.add('is-loading');
+  setState(panel, 'gh-tldr-loading', 'Summarizing…');
+
+  try {
+    const res = await chrome.runtime.sendMessage({ type: 'tldr', text });
+    if (!res) throw new Error('No response from extension background.');
+    if (res.error) throw new Error(res.error);
+    panel.hidden = false;
+    panel.className = 'gh-tldr-panel';
+    renderSummary(panel, res.summary);
+    panel.dataset.loaded = '1';
+  } catch (err) {
+    setState(panel, 'gh-tldr-error', `TLDR failed: ${err.message}`);
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove('is-loading');
+  }
+}
+
+function attach(body) {
+  if (body.hasAttribute(PROCESSED)) return;
+  body.setAttribute(PROCESSED, '1');
+
+  if (textOf(body).length < MIN_CHARS) return;
+
+  const container = commentContainerOf(body);
+  if (!container) return;
+
+  const btn = makeButton();
+  const panel = makePanel();
+
+  let actions = null;
+  for (const sel of ACTION_SELECTORS) {
+    actions = container.querySelector(sel);
+    if (actions) break;
+  }
+
+  if (actions) {
+    actions.insertBefore(btn, actions.firstChild);
+  } else {
+    const bar = document.createElement('div');
+    bar.className = 'gh-tldr-bar';
+    bar.appendChild(btn);
+    body.parentElement.insertBefore(bar, body);
+  }
+
+  body.parentElement.insertBefore(panel, body);
+
+  btn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Once a summary exists, the button just toggles it.
+    if (panel.dataset.loaded === '1') {
+      panel.hidden = !panel.hidden;
+      return;
+    }
+    summarize(btn, panel, body);
+  });
+}
+
+function scan() {
+  for (const sel of BODY_SELECTORS) {
+    for (const body of document.querySelectorAll(sel)) attach(body);
+  }
+}
+
+let pending = null;
+const observer = new MutationObserver(() => {
+  if (pending) return;
+  pending = setTimeout(() => {
+    pending = null;
+    scan();
+  }, 300);
+});
+
+scan();
+observer.observe(document.body, { childList: true, subtree: true });

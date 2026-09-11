@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "GitHub TLDR",
+  "version": "1.0.0",
+  "description": "Adds a TLDR button to GitHub comments and summarizes them with OpenAI.",
+  "permissions": ["storage"],
+  "host_permissions": ["https://api.openai.com/*"],
+  "background": { "service_worker": "background.js" },
+  "options_page": "options.html",
+  "action": { "default_popup": "options.html", "default_title": "GitHub TLDR settings" },
+  "content_scripts": [
+    {
+      "matches": ["https://github.com/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

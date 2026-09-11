@@ -1,0 +1,68 @@
+.gh-tldr-btn {
+  font: 600 12px/20px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  color: var(--fgColor-muted, #656d76);
+  background: transparent;
+  border: 1px solid var(--borderColor-default, #d0d7de);
+  border-radius: 6px;
+  padding: 0 8px;
+  margin-right: 8px;
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.gh-tldr-btn:hover:not(:disabled) {
+  background: var(--bgColor-neutral-muted, #f6f8fa);
+  color: var(--fgColor-default, #1f2328);
+}
+
+.gh-tldr-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.gh-tldr-bar {
+  padding: 6px 16px 0;
+}
+
+.gh-tldr-panel {
+  margin: 8px 16px;
+  padding: 10px 12px;
+  border: 1px solid var(--borderColor-default, #d0d7de);
+  border-left: 3px solid var(--fgColor-accent, #0969da);
+  border-radius: 6px;
+  background: var(--bgColor-neutral-muted, #f6f8fa);
+  font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  color: var(--fgColor-default, #1f2328);
+}
+
+.gh-tldr-title {
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fgColor-muted, #656d76);
+  margin-bottom: 6px;
+}
+
+.gh-tldr-list {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.gh-tldr-list li {
+  margin: 2px 0;
+}
+
+.gh-tldr-text {
+  white-space: pre-wrap;
+}
+
+.gh-tldr-loading {
+  color: var(--fgColor-muted, #656d76);
+  font-style: italic;
+}
+
+.gh-tldr-error {
+  border-left-color: var(--fgColor-danger, #cf222e);
+  color: var(--fgColor-danger, #cf222e);
+}
