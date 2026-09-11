@@ -14,6 +14,14 @@ const ACTION_SELECTORS = [
   '.js-comment-header-actions',
 ];
 
+// The cluster holding the Member/Collaborator badge and the kebab menu. The
+// button goes at the visually-left end of it, ahead of the badge.
+//   classic + PRs: the flex-row-reverse row that wraps .timeline-comment-actions
+//   React issues:  IssueBodyHeader's badgesSection (badgeGroup, then actions)
+const BADGE_ROW_SELECTORS = [
+  '[class*="IssueBodyHeader-module__badgesSection"]',
+];
+
 // The React issue view ships no action bar at all — its header is a plain flex
 // row — so fall back to appending at the end of that header. These are CSS
 // module class names whose trailing hash changes on every GitHub deploy
@@ -75,6 +83,15 @@ function wandIcon() {
     svg.appendChild(path);
   }
   return svg;
+}
+
+// "Left" is not the same as "first child": GitHub lays the classic header row
+// out with flex-row-reverse, so DOM order there runs right to left. Ask the
+// browser which way the row actually flows rather than assuming.
+function insertLeftmost(row, btn) {
+  const direction = (getComputedStyle(row).flexDirection || 'row');
+  if (direction.includes('reverse')) row.appendChild(btn);
+  else row.insertBefore(btn, row.firstChild);
 }
 
 function makeButton() {
@@ -175,7 +192,27 @@ function attach(body) {
 
   let placed = false;
 
-  for (const sel of ACTION_SELECTORS) {
+  // Preferred: immediately left of the Member/Collaborator badge.
+  for (const sel of BADGE_ROW_SELECTORS) {
+    const row = container.querySelector(sel);
+    if (row) {
+      insertLeftmost(row, btn);
+      placed = true;
+      break;
+    }
+  }
+
+  // Classic and PR headers have no badge wrapper of their own; the badge sits
+  // beside .timeline-comment-actions in the row above it.
+  if (!placed) {
+    const actions = container.querySelector('.timeline-comment-actions');
+    if (actions && actions.parentElement) {
+      insertLeftmost(actions.parentElement, btn);
+      placed = true;
+    }
+  }
+
+  if (!placed) for (const sel of ACTION_SELECTORS) {
     const actions = container.querySelector(sel);
     if (actions) {
       actions.insertBefore(btn, actions.firstChild);

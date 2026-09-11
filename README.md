@@ -114,19 +114,29 @@ from `.gh-tldr-btn` into `.gh-tldr-btn:hover:not(:disabled)`.
 
 ## Where the button is placed
 
-Three strategies, in order:
+The button goes immediately **left of the `Member` / `Collaborator` badge**, in
+issues, comments and PRs alike. Strategies, in order:
 
-1. **An action bar** (`.timeline-comment-actions` and friends) — classic timeline
-   comments and pull requests. The button is prepended, ahead of the existing
-   controls.
-2. **A bare header** — GitHub's React issue view ships *no* action bar for the
-   issue description, so the button is appended to the end of the header row and
-   right-aligned with `.gh-tldr-btn--header`. Those headers are CSS modules whose
-   class names carry a per-deploy build hash
-   (`ActivityHeader-module__activityHeader__ZGlyB`), so the selectors match the
-   stable module prefix with `[class*="…"]`, never the hash.
-3. **Its own row above the body** — the last resort, and previously what the
-   issue description incorrectly got.
+1. **The React issue badges row** (`IssueBodyHeader-module__badgesSection`) —
+   holds the badge group and then the kebab.
+2. **The classic/PR header row** — the flex row wrapping
+   `.timeline-comment-actions`, which is where the badge lives as a sibling.
+3. **Other action bars**, then **a bare header**, then **its own row above the
+   body** as the last resort.
+
+Left is not the same as first child: GitHub lays the classic header out with
+`flex-row-reverse`, so DOM order there runs right to left while the React badges
+row runs the usual way. `insertLeftmost()` reads `getComputedStyle(row)
+.flexDirection` and appends or prepends accordingly, rather than assuming either.
+
+Those React headers are CSS modules whose class names carry a per-deploy build
+hash (`ActivityHeader-module__activityHeader__ZGlyB`), so the selectors match the
+stable module prefix with `[class*="…"]`, never the hash.
+
+The button centres itself with `align-self: center` for GitHub's flex header
+rows plus `vertical-align: middle` for inline ones, an explicit `line-height`
+so its box stays symmetric around the label, and `display: block` on the icon to
+drop the inline baseline gap under the glyph.
 
 ## Caching
 

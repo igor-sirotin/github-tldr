@@ -65,7 +65,14 @@
     color: var(--fgColor-muted);
   }
   .timeline-comment-header strong { color: var(--fgColor-default); }
-  .timeline-comment-actions { display: flex; align-items: center; margin-left: auto; }
+  /* GitHub lays this row out right-to-left, so DOM order runs kebab then badge. */
+  .header-right { display: flex; flex-direction: row-reverse; align-items: center; gap: 8px; margin-left: auto; }
+  .timeline-comment-actions { display: flex; align-items: center; }
+  .Label {
+    display: inline-block; padding: 0 7px; font-size: 12px; line-height: 18px;
+    border: 1px solid var(--borderColor-default); border-radius: 999px;
+    color: var(--fgColor-muted);
+  }
   .js-comment-body { padding: 16px; display: grid; gap: 12px; }
   .js-comment-body p { margin: 0; }
   .js-comment-body code {
@@ -111,7 +118,10 @@
   <div class="timeline-comment js-comment-container">
     <div class="timeline-comment-header">
       <strong>octocat</strong> commented on <span>2026-03-14</span>
-      <div class="timeline-comment-actions"></div>
+      <div class="header-right">
+        <div class="timeline-comment-actions">···</div>
+        <div><span class="Label">Member</span></div>
+      </div>
     </div>
     <div class="js-comment-body">
       <p>I spent some time digging into why the incremental build regressed after we split the app into feature modules. The short version is that the module graph is fine, but every target re-emits the shared <code>Design</code> module's interface file, so downstream targets always look dirty to the build system.</p>
@@ -123,7 +133,10 @@
   <div class="timeline-comment js-comment-container">
     <div class="timeline-comment-header">
       <strong>monalisa</strong> commented on <span>2026-03-15</span>
-      <div class="timeline-comment-actions"></div>
+      <div class="header-right">
+        <div class="timeline-comment-actions">···</div>
+        <div><span class="Label">Member</span></div>
+      </div>
     </div>
     <div class="js-comment-body">
       <p>Agreed on the second option, but let's land the pinned output path first so the branch is usable this week. The split touches every import site and I would rather review that on its own. Also worth checking whether the CI cache key includes the configuration name — if it does not, we are paying for this twice on every merge queue run.</p>
@@ -134,7 +147,10 @@
   <div class="timeline-comment js-comment-container">
     <div class="timeline-comment-header">
       <strong>hubot</strong> commented on <span>2026-03-16</span>
-      <div class="timeline-comment-actions"></div>
+      <div class="header-right">
+        <div class="timeline-comment-actions">···</div>
+        <div><span class="Label">Member</span></div>
+      </div>
     </div>
     <div class="js-comment-body">
       <p>PRESEEDED — this comment is already in the preview's stub cache, so its summary
@@ -149,6 +165,10 @@
     <div class="IssueBodyHeader-module__IssueBodyHeaderContainer__demo">
       <div class="ActivityHeader-module__activityHeader__demo">
         <strong>octocat</strong> opened this issue · Issue description (React view)
+        <div class="IssueBodyHeader-module__badgesSection__demo" style="display:flex;align-items:center;gap:8px;margin-left:auto">
+          <div class="IssueBodyHeader-module__badgeGroup__demo"><span class="Label">Collaborator</span></div>
+          <div class="IssueBodyHeader-module__actionsSection__demo">···</div>
+        </div>
       </div>
     </div>
     <div data-testid="issue-body-viewer">

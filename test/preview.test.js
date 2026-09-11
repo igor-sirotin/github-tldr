@@ -11,13 +11,18 @@ JSDOM.fromURL(file, { runScripts: 'dangerously', resources: 'usable', pretendToB
   .then(async (dom) => {
     const doc = dom.window.document;
 
-    const injected = doc.querySelectorAll('.timeline-comment-actions .gh-tldr-btn');
+    const injected = doc.querySelectorAll('.header-right > .gh-tldr-btn');
     assert(injected.length === 3, `a button is injected into each of the three mock comments (got ${injected.length})`);
+    // flex-row-reverse: last in DOM is leftmost on screen.
+    assert([...injected[0].parentElement.children].pop() === injected[0],
+      'classic mock: button is the leftmost item, ahead of the Member badge');
 
     // The issue-view mock has no action bar; the button belongs in its header.
     const issueBtn = doc.querySelector('[data-testid="issue-body"] .gh-tldr-btn');
     assert(issueBtn && issueBtn.closest('[class*="ActivityHeader-module__activityHeader"]'),
       'issue-view mock: button lands in the header');
+    assert(issueBtn.parentElement.firstElementChild === issueBtn,
+      'issue-view mock: button is first in the badges row, ahead of the Collaborator badge');
     assert(!doc.querySelector('[data-testid="issue-body"] .gh-tldr-bar'),
       'issue-view mock: no fallback bar');
     assert(doc.querySelectorAll('.states .gh-tldr-btn').length === 2, 'the states row shows idle and loading buttons');

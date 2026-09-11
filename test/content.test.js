@@ -11,7 +11,12 @@ const long = 'This is a long GitHub comment that definitely deserves a summary. 
 // page, to prove we match the module prefix and not the build hash.
 const dom = new JSDOM(`<!doctype html><body>
   <div class="js-comment-container">
-    <div class="timeline-comment-header"><div class="timeline-comment-actions"><button>…</button></div></div>
+    <div class="timeline-comment-header">
+      <div class="d-flex flex-row-reverse flex-items-center" id="classic-row" style="display:flex;flex-direction:row-reverse">
+        <div class="timeline-comment-actions"><button>…</button></div>
+        <div class="d-none d-sm-flex"><span class="tooltipped"><span class="Label ml-1 tmp-ml-1">Member</span></span></div>
+      </div>
+    </div>
     <div class="comment-body js-comment-body">${long}</div>
   </div>
   <div data-testid="comment-viewer-outer-box">
@@ -28,6 +33,10 @@ const dom = new JSDOM(`<!doctype html><body>
           <div class="ActivityHeader-module__activityHeader__xxxx">
             <div class="IssueBodyHeader-module__avatarContainer__xxxx"></div>
             <div class="IssueBodyHeader-module__titleSection__xxxx"></div>
+            <div class="IssueBodyHeader-module__badgesSection__xxxx" id="issue-row" style="display:flex">
+              <div class="IssueBodyHeader-module__badgeGroup__xxxx"><span class="Label">Collaborator</span></div>
+              <div class="IssueBodyHeader-module__actionsSection__xxxx"><button>…</button></div>
+            </div>
           </div>
         </div>
         <div id="issue-body-viewer" data-testid="issue-body-viewer">
@@ -59,7 +68,24 @@ const assert = (cond, msg) => { if (!cond) { console.error('FAIL:', msg); proces
 
 const btns = doc.querySelectorAll('.gh-tldr-btn');
 assert(btns.length === 3, `button injected on both long comments and the issue description, skipped the short one (got ${btns.length})`);
-assert(doc.querySelector('.timeline-comment-actions .gh-tldr-btn'), 'classic comment: button lands in the action bar');
+// Visual order is what matters, and the classic row runs right-to-left.
+function visualOrder(rowId) {
+  const row = doc.getElementById(rowId);
+  const kids = [...row.children];
+  const reversed = row.style.flexDirection.includes('reverse');
+  return (reversed ? kids.reverse() : kids).map((el) =>
+    el.classList.contains('gh-tldr-btn') ? 'TLDR' : (el.textContent.trim().replace('…', 'kebab') || '?')
+  );
+}
+
+const classicOrder = visualOrder('classic-row');
+assert(classicOrder[0] === 'TLDR', `classic/PR: button is leftmost, before the badge (got ${classicOrder.join(' | ')})`);
+assert(classicOrder.indexOf('TLDR') < classicOrder.indexOf('Member'), 'classic/PR: button sits left of the Member badge');
+assert(!doc.querySelector('.timeline-comment-actions .gh-tldr-btn'), 'classic/PR: button moved out of the kebab action bar');
+
+const issueOrder = visualOrder('issue-row');
+assert(issueOrder[0] === 'TLDR', `issue: button is leftmost in the badges row (got ${issueOrder.join(' | ')})`);
+assert(issueOrder.indexOf('TLDR') < issueOrder.indexOf('Collaborator'), 'issue: button sits left of the Collaborator badge');
 assert(btns[0].querySelector('svg.gh-tldr-wand'), 'button carries the wand icon with the design class');
 assert(btns[0].querySelectorAll('svg.gh-tldr-wand path').length === 8, 'icon has all 8 lucide wand-sparkles paths');
 assert(btns[0].querySelector('svg.gh-tldr-wand').namespaceURI === 'http://www.w3.org/2000/svg', 'icon built in the SVG namespace');
@@ -77,7 +103,7 @@ assert(
   'issue description: button sits in the header, not above the body'
 );
 assert(!issueBody.querySelector('.gh-tldr-bar'), 'issue description: no fallback bar is created');
-assert(issueBtn.classList.contains('gh-tldr-btn--header'), 'header placement marks the button so CSS can right-align it');
+assert(!issueBtn.classList.contains('gh-tldr-btn--header'), 'badge-row placement does not need the right-align modifier');
 assert(
   issueBody.querySelector('[data-testid="issue-body-viewer"] .gh-tldr-panel'),
   'issue description: panel still renders next to the body'
