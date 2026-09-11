@@ -55,16 +55,48 @@ function textOf(el) {
   return (el.innerText ?? el.textContent ?? '').trim();
 }
 
+// Every distinct comment body inside `root`, counting one comment once even
+// though several selectors can match the same element, and ignoring bodies
+// nested inside another matched body.
+function commentBodiesIn(root) {
+  const found = [];
+  for (const sel of BODY_SELECTORS) {
+    for (const el of root.querySelectorAll(sel)) if (!found.includes(el)) found.push(el);
+  }
+  return found.filter((el) => !found.some((other) => other !== el && other.contains(el)));
+}
+
+// The widest ancestor that still holds this comment and no other. Climbing
+// stops the moment an ancestor also contains a sibling comment.
+function ownContainerOf(body) {
+  let el = body.parentElement;
+  let best = el;
+  while (el && el !== document.body) {
+    if (commentBodiesIn(el).length > 1) break;
+    best = el;
+    el = el.parentElement;
+  }
+  return best;
+}
+
 function commentContainerOf(body) {
-  return (
+  const known =
+    body.closest('.js-comment') ||
+    body.closest('.review-comment') ||
     body.closest('.js-comment-container') ||
     body.closest('.timeline-comment') ||
     body.closest('[data-testid="comment-viewer-outer-box"]') ||
     body.closest('.react-issue-comment') ||
     body.closest('[data-testid="issue-body"]') ||
-    body.closest('.react-issue-body') ||
-    body.parentElement
-  );
+    body.closest('.react-issue-body');
+
+  // A pull request review thread nests all of its comments inside a single
+  // .js-comment-container, so that container is too broad: querySelector would
+  // hand every comment in the thread the first comment's header, and all the
+  // buttons would pile up there. Only trust a known container if it holds this
+  // comment alone; otherwise fall back to the nearest ancestor that does.
+  if (known && commentBodiesIn(known).length <= 1) return known;
+  return ownContainerOf(body) || body.parentElement;
 }
 
 function wandIcon() {

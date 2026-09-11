@@ -25,6 +25,32 @@ const dom = new JSDOM(`<!doctype html><body>
   <div class="js-comment-container">
     <div class="comment-body js-comment-body">too short</div>
   </div>
+  <!-- A PR review thread, as github.com serves it: three comments sharing one
+       .js-comment-container, each with its own header and reversed action row. -->
+  <review-thread-collapsible class="js-comment-container js-resolvable-timeline-thread-container">
+    <div class="js-inline-comments-container">
+      <div class="js-comment review-comment" id="discussion_r1">
+        <div class="flex-row-reverse" id="thread-row-1" style="display:flex;flex-direction:row-reverse">
+          <div class="timeline-comment-actions"><button>…</button></div>
+          <span class="Label">Member</span>
+        </div>
+        <div class="comment-body js-comment-body">${long} First reply in the thread.</div>
+      </div>
+      <div class="js-comment review-comment" id="discussion_r2">
+        <div class="flex-row-reverse" id="thread-row-2" style="display:flex;flex-direction:row-reverse">
+          <div class="timeline-comment-actions"><button>…</button></div>
+          <span class="Label">Collaborator</span>
+        </div>
+        <div class="comment-body js-comment-body">${long} Second reply in the thread.</div>
+      </div>
+      <div class="js-comment review-comment" id="discussion_r3">
+        <div class="flex-row-reverse" id="thread-row-3" style="display:flex;flex-direction:row-reverse">
+          <div class="timeline-comment-actions"><button>…</button></div>
+        </div>
+        <div class="comment-body js-comment-body">${long} Third reply in the thread.</div>
+      </div>
+    </div>
+  </review-thread-collapsible>
   <div data-testid="issue-body" class="react-issue-body IssueBody-module__innerContainer__xxxx">
     <h2 class="sr-only">Description</h2>
     <div class="IssueBody-module__headerRow__xxxx">
@@ -67,7 +93,7 @@ const doc = dom.window.document;
 const assert = (cond, msg) => { if (!cond) { console.error('FAIL:', msg); process.exitCode = 1; } else console.log('ok -', msg); };
 
 const btns = doc.querySelectorAll('.gh-tldr-btn');
-assert(btns.length === 3, `button injected on both long comments and the issue description, skipped the short one (got ${btns.length})`);
+assert(btns.length === 6, `a button per comment: 2 comments + 3 thread replies + the issue description (got ${btns.length})`);
 // Visual order is what matters, and the classic row runs right-to-left.
 function visualOrder(rowId) {
   const row = doc.getElementById(rowId);
@@ -82,6 +108,18 @@ const classicOrder = visualOrder('classic-row');
 assert(classicOrder[0] === 'TLDR', `classic/PR: button is leftmost, before the badge (got ${classicOrder.join(' | ')})`);
 assert(classicOrder.indexOf('TLDR') < classicOrder.indexOf('Member'), 'classic/PR: button sits left of the Member badge');
 assert(!doc.querySelector('.timeline-comment-actions .gh-tldr-btn'), 'classic/PR: button moved out of the kebab action bar');
+
+// The reported bug: three comments in one thread put all three buttons in the
+// first comment's header instead of one each.
+for (const n of [1, 2, 3]) {
+  const comment = doc.getElementById('discussion_r' + n);
+  const own = comment.querySelectorAll('.gh-tldr-btn');
+  assert(own.length === 1, `thread comment ${n} has exactly one button (got ${own.length})`);
+  assert(own[0].closest('.js-comment') === comment, `thread comment ${n}'s button stays in its own comment`);
+  const row = doc.getElementById('thread-row-' + n);
+  assert([...row.children].pop() === own[0], `thread comment ${n}: button is leftmost in its own row`);
+}
+assert(doc.querySelectorAll('review-thread-collapsible .gh-tldr-btn').length === 3, 'thread has three buttons total, not stacked');
 
 const issueOrder = visualOrder('issue-row');
 assert(issueOrder[0] === 'TLDR', `issue: button is leftmost in the badges row (got ${issueOrder.join(' | ')})`);
@@ -117,7 +155,7 @@ assert(
   await new Promise((r) => setTimeout(r, 20));
 
   const tldrs = () => sent.filter((m) => m.type === 'tldr');
-  assert(sent.filter((m) => m.type === 'peek').length === 3, 'cache peeked once per comment on attach');
+  assert(sent.filter((m) => m.type === 'peek').length === 6, 'cache peeked once per comment on attach');
   assert(tldrs().length === 1, 'one tldr message sent to background');
   assert(tldrs()[0].text.includes('deserves a summary'), 'comment text forwarded');
   assert(panel.hidden === false, 'panel visible after summarizing');

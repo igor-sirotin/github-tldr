@@ -12,7 +12,14 @@ JSDOM.fromURL(file, { runScripts: 'dangerously', resources: 'usable', pretendToB
     const doc = dom.window.document;
 
     const injected = doc.querySelectorAll('.header-right > .gh-tldr-btn');
-    assert(injected.length === 3, `a button is injected into each of the three mock comments (got ${injected.length})`);
+    assert(injected.length === 6, `a button per comment, threads included (got ${injected.length})`);
+
+    const replies = doc.querySelectorAll('review-thread-collapsible .js-comment.review-comment');
+    assert(replies.length === 3, 'thread mock has three comments');
+    for (const [n, reply] of [...replies].entries()) {
+      assert(reply.querySelectorAll('.gh-tldr-btn').length === 1,
+        `thread reply ${n + 1} carries exactly one button`);
+    }
     // flex-row-reverse: last in DOM is leftmost on screen.
     assert([...injected[0].parentElement.children].pop() === injected[0],
       'classic mock: button is the leftmost item, ahead of the Member badge');
@@ -27,7 +34,7 @@ JSDOM.fromURL(file, { runScripts: 'dangerously', resources: 'usable', pretendToB
       'issue-view mock: no fallback bar');
     assert(doc.querySelectorAll('.states .gh-tldr-btn').length === 2, 'the states row shows idle and loading buttons');
     assert(doc.querySelector('.states .gh-tldr-btn.is-loading[disabled]'), 'loading state button is present and disabled');
-    assert(doc.querySelectorAll('svg.gh-tldr-wand').length === 6, 'every button carries the wand icon');
+    assert(doc.querySelectorAll('svg.gh-tldr-wand').length === 9, 'every button carries the wand icon');
     assert(doc.querySelector('link[href="content.css"]'), 'preview links the real stylesheet');
 
     // The pre-seeded comment must be summarized on load, with no click.

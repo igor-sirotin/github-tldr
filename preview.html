@@ -48,6 +48,10 @@
     cursor: pointer;
   }
   .bar .spacer { margin-left: auto; }
+  review-thread-collapsible { display: block; background: var(--bgColor-default); border: 1px solid var(--borderColor-default); border-radius: 6px; overflow: hidden; }
+  .review-comment + .review-comment { border-top: 1px solid var(--borderColor-default); }
+  .review-comment .js-comment-body { padding: 16px; }
+  .review-comment .js-comment-body p { margin: 0; }
   .timeline-comment {
     background: var(--bgColor-default);
     border: 1px solid var(--borderColor-default);
@@ -160,6 +164,51 @@
       <p>Press "Clear cache" above to watch it go back to needing a click.</p>
     </div>
   </div>
+  <!-- A PR review thread: several comments sharing one .js-comment-container. -->
+  <review-thread-collapsible class="timeline-comment js-comment-container js-resolvable-timeline-thread-container">
+    <div class="js-inline-comments-container">
+      <div class="js-comment review-comment">
+        <div class="timeline-comment-header">
+          <strong>hubot</strong> reviewed
+          <div class="header-right">
+            <div class="timeline-comment-actions">···</div>
+            <div><span class="Label">Member</span></div>
+          </div>
+        </div>
+        <div class="js-comment-body">
+          <p>Review thread, first comment. Each comment in a thread needs its own button:
+          they share one container, so a naive lookup finds the first header three times and
+          stacks every button there.</p>
+        </div>
+      </div>
+      <div class="js-comment review-comment">
+        <div class="timeline-comment-header">
+          <strong>octocat</strong> replied
+          <div class="header-right">
+            <div class="timeline-comment-actions">···</div>
+            <div><span class="Label">Collaborator</span></div>
+          </div>
+        </div>
+        <div class="js-comment-body">
+          <p>Second reply. This one should carry its own button in its own header, left of the
+          Collaborator badge, exactly like a top-level comment does.</p>
+        </div>
+      </div>
+      <div class="js-comment review-comment">
+        <div class="timeline-comment-header">
+          <strong>monalisa</strong> replied
+          <div class="header-right">
+            <div class="timeline-comment-actions">···</div>
+          </div>
+        </div>
+        <div class="js-comment-body">
+          <p>Third reply, with no author badge at all — the button still belongs at the left
+          end of this comment's own header row rather than in the one above.</p>
+        </div>
+      </div>
+    </div>
+  </review-thread-collapsible>
+
   <div data-testid="issue-body" class="react-issue-body">
     <h2 class="sr-only" hidden>Description</h2>
     <div class="IssueBodyHeader-module__IssueBodyHeaderContainer__demo">

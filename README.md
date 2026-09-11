@@ -114,8 +114,17 @@ from `.gh-tldr-btn` into `.gh-tldr-btn:hover:not(:disabled)`.
 
 ## Where the button is placed
 
-The button goes immediately **left of the `Member` / `Collaborator` badge**, in
-issues, comments and PRs alike. Strategies, in order:
+First the extension decides **which comment it is placing into**. That is not
+always the nearest container with a familiar class: a pull request review thread
+nests all of its replies inside a single `.js-comment-container`
+(`<review-thread-collapsible>`), so trusting that container would hand every
+reply the *first* comment's header and stack every button there. A known
+container is therefore used only if it holds exactly one comment body; otherwise
+the code climbs from the body to the widest ancestor that still contains this
+comment and no other.
+
+Then the button goes immediately **left of the `Member` / `Collaborator` badge**,
+in issues, comments and PRs alike. Strategies, in order:
 
 1. **The React issue badges row** (`IssueBodyHeader-module__badgesSection`) —
    holds the badge group and then the kebab.
