@@ -1,8 +1,8 @@
 # GitHub TLDR
 
-A small Chrome/Edge extension (Manifest V3) that adds a **TLDR** button to every
-GitHub comment. Click it and the comment is summarized into at most three bullets
-by the OpenAI API.
+A small Chrome/Edge extension (Manifest V3) that adds a **TLDR** entry to the
+`···` menu on every GitHub comment, directly under *Quote reply*. Choose it and
+the comment is summarized into at most three bullets by the OpenAI API.
 
 ## Install
 
@@ -28,13 +28,14 @@ scripts on github.com.
 
 ## How it works
 
-- `content.js` finds comment bodies on `github.com` (classic timeline and the
-  React issue views), injects a **TLDR** button into the comment's action bar,
-  and renders the result in a panel above the comment. A `MutationObserver`
-  handles GitHub's client-side navigation and lazily loaded comments.
+- `content.js` finds comment bodies on `github.com` (classic timeline, review
+  threads and the React issue views), adds a **TLDR** entry to each comment's
+  `···` menu, and renders the result in a panel above the comment. A
+  `MutationObserver` handles GitHub's client-side navigation and lazily loaded
+  comments.
 - `background.js` reads the settings and calls
   `POST {baseUrl}/chat/completions`, returning the summary to the content script.
-- Comments shorter than 120 characters get no button; comment text is truncated
+- Comments shorter than 120 characters get no entry; comment text is truncated
   to 12k characters before being sent.
 
 ## Model choice
@@ -51,7 +52,7 @@ between model families are handled automatically: if the API rejects
 request is rebuilt without it (swapping in `max_completion_tokens` where needed)
 and retried, and the result is remembered for later calls.
 
-Clicking **TLDR** again hides/shows the existing summary — it does not re-bill a
+Choosing **TLDR** again hides/shows the existing summary — it does not re-bill a
 second request.
 
 ## Files
@@ -59,13 +60,13 @@ second request.
 | File | Purpose |
 | --- | --- |
 | `manifest.json` | MV3 manifest, `github.com` content script, `api.openai.com` host permission |
-| `content.js` | Button injection, wand icon, panel rendering, cache peek |
-| `preview.html` | Standalone design preview, no extension install needed |
-| `content.css` | Styles, themed with GitHub's CSS variables (works in dark mode) |
+| `content.js` | Menu entry, wand icon, panel rendering, cache peek |
+| `preview.html` | Standalone preview with working menus, no extension install needed |
+| `content.css` | Panel styles, themed with GitHub's CSS variables (works in dark mode) |
 | `background.js` | OpenAI request, summary cache |
 | `options.html` / `options.js` | Key, model and base URL settings, cache size and clear |
 
-## Previewing the button without installing
+## Previewing without installing
 
 Open `preview.html` in a browser — no extension loading, no build step, no server:
 
@@ -74,84 +75,59 @@ xdg-open preview.html    # or just double-click it
 ```
 
 It loads the extension's real `content.css` and `content.js` and stubs only the
-extension APIs, so the button you see is the one that ships. There is a button
-states row (idle and loading side by side), three mock comments, and a theme
-toggle. The stub fails every second call so the error state is reachable, and
-the third comment is pre-seeded in the stub's cache so it opens on load without
-a click — press **Clear cache** to put it back.
+extension APIs, so what you see is what ships. Open any `···` menu and **TLDR**
+is there under *Quote reply*. There are mock comments in three layouts — classic,
+a review thread, and the React issue view — plus a theme toggle. The stub fails
+every second call so the error state is reachable, and one comment is pre-seeded
+in the stub's cache so it opens on load without any interaction; press **Clear
+cache** to put it back.
 
-## Button styling
+## The menu entry
 
-`content.css` is the design handed off in the **GitHub TLDR extension design**
-Claude Design project, applied verbatim.
+The entry is added to the comment's own `···` menu rather than injected as a
+button in the header, so it costs no header space and matches how GitHub's other
+per-comment actions are reached.
 
-The **TLDR** button carries [lucide.dev](https://lucide.dev)'s `wand-sparkles`
-icon, stroked with `currentColor` so it follows the GitHub theme. It is built
-with `createElementNS` rather than assigned as an `innerHTML` string, which is
-the one deliberate deviation from the handoff's `content.js`; the rendered
-result is identical.
+Finding the right spot without knowing GitHub's class names:
 
-The sheen timings are the one deviation from the handoff, at explicit request:
-5x slower than specified (35s at rest, 11s hover, 7s loading, against the
-handoff's 7s / 2.2s / 1.4s), because the original read as distracting on a long
-thread. This is effectively an answer to the handoff's own open question. The
-wand wave is a rotation rather than a colour cycle and stays at 1s.
+- **Anchor on *Quote reply*.** The `.js-comment-quote-reply` hook is tried first
+  and the visible label is the fallback, so the entry lands immediately under it
+  and therefore at the end of the menu's first section, above the divider. The
+  label fallback is the one part a non-English UI would miss.
+- **Borrow the neighbour's classes.** The new entry copies the Quote reply
+  item's `className` and `role`, so GitHub styles it natively in both the
+  classic `details-menu` and Primer's `ActionList` without the extension
+  shipping a single menu-item colour. It only carries the wand icon if the menu
+  it joins already uses icons.
+- **Insert beside, not inside.** Classic items sit in a wrapper `<span>`, so the
+  entry is placed after the outermost wrapper that is still inside the menu.
 
-The gradient stroke is a two-layer background — a flat surface layer clipped to
-`padding-box` over a `#0969da → #8250df → #bf3989 → #bc4c00 → #1a7f37` gradient
-clipped to `border-box`, all GitHub's own accent hues. The `gh-tldr-sheen`
-animation slides that second layer, 7s at rest, 2.2s on hover, 1.4s while
-loading, where the wand also waves ±12°. The surface layer reads
-`--gh-tldr-surface` so the button stays legible in dark mode.
+Menus are re-rendered every time they open, and Primer portals its menu to the
+end of the document rather than leaving it inside the comment. So the entry is
+re-added on mutations and on the frames right after any click, and the owning
+comment is resolved from the menu itself where it is inline, or from whichever
+trigger was last clicked where it is not.
 
-The panel drops the old blue left border for a 1px box with a static 2px
-gradient hairline along the top — deliberately still, so the result does not
-compete with the control — a mono uppercase title and custom 4px bullet dots.
+## Which comment
 
-`prefers-reduced-motion` disables the sheen and the wave. The sheen runs whenever
-a button is on screen; to restrict it to hover, move `animation: gh-tldr-sheen …`
-from `.gh-tldr-btn` into `.gh-tldr-btn:hover:not(:disabled)`.
+A pull request review thread nests all of its replies inside a single
+`.js-comment-container` (`<review-thread-collapsible>`), so trusting that
+container would hand every reply the first comment's menu. A known container is
+therefore used only if it holds exactly one comment body; otherwise the code
+climbs from the body to the widest ancestor containing this comment and no other.
 
-## Where the button is placed
-
-First the extension decides **which comment it is placing into**. That is not
-always the nearest container with a familiar class: a pull request review thread
-nests all of its replies inside a single `.js-comment-container`
-(`<review-thread-collapsible>`), so trusting that container would hand every
-reply the *first* comment's header and stack every button there. A known
-container is therefore used only if it holds exactly one comment body; otherwise
-the code climbs from the body to the widest ancestor that still contains this
-comment and no other.
-
-Then the button goes immediately **left of the `Member` / `Collaborator` badge**,
-in issues, comments and PRs alike. Strategies, in order:
-
-1. **The React issue badges row** (`IssueBodyHeader-module__badgesSection`) —
-   holds the badge group and then the kebab.
-2. **The classic/PR header row** — the flex row wrapping
-   `.timeline-comment-actions`, which is where the badge lives as a sibling.
-3. **Other action bars**, then **a bare header**, then **its own row above the
-   body** as the last resort.
-
-Left is not the same as first child: GitHub lays the classic header out with
-`flex-row-reverse`, so DOM order there runs right to left while the React badges
-row runs the usual way. `insertLeftmost()` reads `getComputedStyle(row)
-.flexDirection` and appends or prepends accordingly, rather than assuming either.
-
-Those React headers are CSS modules whose class names carry a per-deploy build
-hash (`ActivityHeader-module__activityHeader__ZGlyB`), so the selectors match the
-stable module prefix with `[class*="…"]`, never the hash.
-
-The button centres itself with `align-self: center` for GitHub's flex header
-rows plus `vertical-align: middle` for inline ones, an explicit `line-height`
-so its box stays symmetric around the label, and `display: block` on the icon to
-drop the inline baseline gap under the glyph.
+The summary panel keeps the design handed off in the **GitHub TLDR extension
+design** Claude Design project: a 1px box with a static 2px gradient hairline
+along the top in GitHub's accent hues, a mono uppercase title and 4px bullet
+dots. The animated gradient button that design also specified is gone with the
+button itself.
 
 ## Caching
 
 A summary is reused rather than re-bought. When the content script attaches to a
 comment it sends a `peek` message; a hit renders the panel immediately, titled
-`TLDR · cached`, with no click and no API call. A miss leaves the panel closed.
+`TLDR · cached`, without the menu being opened at all and with no API call. A
+miss leaves the panel closed until you choose TLDR.
 
 The cache key is a hash of the model and the exact comment text that was sent to
 the API. **That is the version check.** Comments are editable, and an edit moves

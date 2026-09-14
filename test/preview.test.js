@@ -1,5 +1,5 @@
 // Loads preview.html exactly as a browser would (real content.js + content.css)
-// and drives the button, so the preview page can't silently rot.
+// and drives the menu, so the preview page can't silently rot.
 const { JSDOM } = require('jsdom');
 const path = require('path');
 
@@ -7,64 +7,59 @@ const file = 'file://' + path.join(__dirname, '..', 'preview.html');
 const assert = (c, m) => { if (!c) { console.error('FAIL:', m); process.exitCode = 1; } else console.log('ok -', m); };
 
 JSDOM.fromURL(file, { runScripts: 'dangerously', resources: 'usable', pretendToBeVisual: true })
-  .then((dom) => new Promise((r) => dom.window.addEventListener('load', () => setTimeout(() => r(dom), 200))))
+  .then((dom) => new Promise((r) => dom.window.addEventListener('load', () => setTimeout(() => r(dom), 300))))
   .then(async (dom) => {
     const doc = dom.window.document;
+    const click = (el) => el.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
 
-    const injected = doc.querySelectorAll('.header-right > .gh-tldr-btn');
-    assert(injected.length === 6, `a button per comment, threads included (got ${injected.length})`);
+    const menus = doc.querySelectorAll('details-menu');
+    assert(menus.length === 7, `every mock comment has a menu (got ${menus.length})`);
+    assert(doc.querySelectorAll('.gh-tldr-menu-item').length === 7, 'every menu gets a TLDR entry');
+    assert(doc.querySelectorAll('.gh-tldr-btn').length === 0, 'no injected buttons remain in the preview');
+    assert(doc.querySelector('link[href="content.css"]'), 'preview links the real stylesheet');
 
+    for (const menu of menus) {
+      const labels = [...menu.querySelectorAll('[role="menuitem"]')].map((el) => el.textContent.trim());
+      assert(labels[labels.indexOf('Quote reply') + 1] === 'TLDR', `TLDR follows Quote reply (${labels.join(' | ')})`);
+      const entry = menu.querySelector('.gh-tldr-menu-item');
+      assert(entry.compareDocumentPosition(menu.querySelector('.dropdown-divider')) & 4, 'entry is in the first section');
+    }
+
+    // Each thread reply keeps its own entry and its own panel.
     const replies = doc.querySelectorAll('review-thread-collapsible .js-comment.review-comment');
     assert(replies.length === 3, 'thread mock has three comments');
     for (const [n, reply] of [...replies].entries()) {
-      assert(reply.querySelectorAll('.gh-tldr-btn').length === 1,
-        `thread reply ${n + 1} carries exactly one button`);
+      assert(reply.querySelectorAll('.gh-tldr-menu-item').length === 1, `thread reply ${n + 1} has exactly one entry`);
     }
-    // flex-row-reverse: last in DOM is leftmost on screen.
-    assert([...injected[0].parentElement.children].pop() === injected[0],
-      'classic mock: button is the leftmost item, ahead of the Member badge');
 
-    // The issue-view mock has no action bar; the button belongs in its header.
-    const issueBtn = doc.querySelector('[data-testid="issue-body"] .gh-tldr-btn');
-    assert(issueBtn && issueBtn.closest('[class*="ActivityHeader-module__activityHeader"]'),
-      'issue-view mock: button lands in the header');
-    assert(issueBtn.parentElement.firstElementChild === issueBtn,
-      'issue-view mock: button is first in the badges row, ahead of the Collaborator badge');
-    assert(!doc.querySelector('[data-testid="issue-body"] .gh-tldr-bar'),
-      'issue-view mock: no fallback bar');
-    assert(doc.querySelectorAll('.states .gh-tldr-btn').length === 2, 'the states row shows idle and loading buttons');
-    assert(doc.querySelector('.states .gh-tldr-btn.is-loading[disabled]'), 'loading state button is present and disabled');
-    assert(doc.querySelectorAll('svg.gh-tldr-wand').length === 9, 'every button carries the wand icon');
-    assert(doc.querySelector('link[href="content.css"]'), 'preview links the real stylesheet');
+    // The pre-seeded comment still opens on load, with no interaction at all.
+    const seededPanel = [...doc.querySelectorAll('.gh-tldr-panel')]
+      .find((el) => el.parentElement.textContent.includes('PRESEEDED'));
+    assert(seededPanel && seededPanel.hidden === false, 'pre-cached comment opens its panel on load');
+    assert(seededPanel.querySelector('.gh-tldr-title').textContent === 'TLDR · cached', 'and is labelled as cached');
 
-    // The pre-seeded comment must be summarized on load, with no click.
-    const panels = doc.querySelectorAll('.gh-tldr-panel');
-    const seeded = doc.querySelectorAll('.js-comment-container .gh-tldr-panel')[2];
-    assert(seeded && seeded.hidden === false, 'pre-cached comment opens its panel on load');
-    assert(seeded.querySelector('.gh-tldr-title').textContent === 'TLDR · cached', 'and is labelled as cached');
-    assert(seeded.querySelectorAll('.gh-tldr-list li').length === 3, 'cached summary renders its bullets');
-
-    // The other two still start closed.
-    assert(panels[0].hidden === true && panels[1].hidden === true, 'uncached comments start closed');
-
-    injected[0].click();
-    assert(injected[0].classList.contains('is-loading'), 'loading class applied while waiting (drives the wand wave)');
+    // Choosing TLDR summarizes and closes the menu.
+    const first = doc.querySelector('details-menu');
+    const panel = first.closest('.timeline-comment').querySelector('.gh-tldr-panel');
+    assert(panel.hidden === true, 'uncached comment starts closed');
+    click(first.querySelector('.gh-tldr-menu-item'));
+    assert(first.closest('details').open === false, 'menu closes on choosing TLDR');
     await new Promise((r) => setTimeout(r, 1100));
-    assert(panels[0].hidden === false, 'stubbed summary renders');
-    assert(panels[0].querySelectorAll('.gh-tldr-list li').length === 3, 'three bullets in the preview summary');
-    assert(panels[0].querySelector('.gh-tldr-title').textContent === 'TLDR', 'a fresh summary is not labelled cached');
-    assert(!injected[0].classList.contains('is-loading'), 'loading class cleared when done');
+    assert(panel.hidden === false, 'stubbed summary renders');
+    assert(panel.querySelectorAll('.gh-tldr-list li').length === 3, 'three bullets in the preview summary');
+    assert(panel.querySelector('.gh-tldr-title').textContent === 'TLDR', 'a fresh summary is not labelled cached');
 
     // The stub fails every second call, so the next one shows the error state.
-    injected[1].click();
+    const second = doc.querySelectorAll('details-menu')[1];
+    click(second.querySelector('.gh-tldr-menu-item'));
     await new Promise((r) => setTimeout(r, 1100));
-    assert(panels[1].className.includes('gh-tldr-error'), 'second click reaches the error state');
+    assert(second.closest('.timeline-comment').querySelector('.gh-tldr-panel').className.includes('gh-tldr-error'),
+      'second choice reaches the error state');
 
     doc.getElementById('theme').click();
     assert(doc.documentElement.dataset.previewTheme === 'dark', 'theme toggle works');
-
     doc.getElementById('clear').click();
-    assert(seeded.hidden === true && panels[0].hidden === true, 'clear cache closes every panel again');
+    assert(seededPanel.hidden === true && panel.hidden === true, 'clear cache closes every panel again');
     dom.window.close();
   })
   .catch((e) => { console.error('FAIL:', e.message); process.exitCode = 1; });

@@ -1,4 +1,4 @@
-// GitHub TLDR - injects a "TLDR" button next to every GitHub comment.
+// GitHub TLDR - adds a "TLDR" entry to the ... menu on every GitHub comment.
 
 const BODY_SELECTORS = [
   '.js-comment-body',
@@ -7,29 +7,22 @@ const BODY_SELECTORS = [
   '[data-testid="markdown-body"]',
 ];
 
-// Action bars, where the button is prepended ahead of the existing controls.
-const ACTION_SELECTORS = [
-  '.timeline-comment-actions',
-  '[data-testid="comment-header-right-side-items"]',
-  '.js-comment-header-actions',
+// How the "Quote reply" entry is recognised in a comment's ... menu. The JS
+// hook is checked first; the label is the fallback, and the only part that a
+// non-English UI would miss.
+const QUOTE_SELECTORS = [
+  '.js-comment-quote-reply',
+  '[data-testid="quote-reply"]',
+  '[data-testid="comment-quote-reply"]',
 ];
+const QUOTE_LABEL = /^quote reply$/i;
 
-// The cluster holding the Member/Collaborator badge and the kebab menu. The
-// button goes at the visually-left end of it, ahead of the badge.
-//   classic + PRs: the flex-row-reverse row that wraps .timeline-comment-actions
-//   React issues:  IssueBodyHeader's badgesSection (badgeGroup, then actions)
-const BADGE_ROW_SELECTORS = [
-  '[class*="IssueBodyHeader-module__badgesSection"]',
-];
+// Anything that behaves like a menu entry, in either the classic details-menu
+// or Primer's ActionList.
+const MENU_ITEM_SELECTORS = ['[role="menuitem"]', '.dropdown-item'];
 
-// The React issue view ships no action bar at all — its header is a plain flex
-// row — so fall back to appending at the end of that header. These are CSS
-// module class names whose trailing hash changes on every GitHub deploy
-// (…__activityHeader__ZGlyB), hence the prefix match on the stable part.
-const HEADER_SELECTORS = [
-  '[class*="ActivityHeader-module__activityHeader"]',
-  '[class*="IssueBodyHeader-module__IssueBodyHeaderContainer"]',
-];
+// Containers we must not climb out of when looking for the entry's outer cell.
+const MENU_SELECTORS = ['details-menu', '[role="menu"]', '.dropdown-menu', 'action-menu'];
 
 // Lucide "wand-sparkles" (https://lucide.dev/icons/wand-sparkles), ISC licensed.
 // Built as nodes rather than an innerHTML string; sized by .gh-tldr-wand in CSS.
@@ -47,6 +40,7 @@ const WAND_PATHS = [
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
 const PROCESSED = 'data-tldr-ready';
+const MENU_ITEM_CLASS = 'gh-tldr-menu-item';
 const MIN_CHARS = 120; // shorter comments don't need a TLDR
 
 // innerText gives the rendered text (collapsed details, hidden nodes dropped);
@@ -117,26 +111,53 @@ function wandIcon() {
   return svg;
 }
 
-// "Left" is not the same as "first child": GitHub lays the classic header row
-// out with flex-row-reverse, so DOM order there runs right to left. Ask the
-// browser which way the row actually flows rather than assuming.
-function insertLeftmost(row, btn) {
-  const direction = (getComputedStyle(row).flexDirection || 'row');
-  if (direction.includes('reverse')) row.appendChild(btn);
-  else row.insertBefore(btn, row.firstChild);
+function isQuoteReply(el) {
+  if (QUOTE_SELECTORS.some((sel) => el.matches(sel))) return true;
+  return QUOTE_LABEL.test(textOf(el));
 }
 
-function makeButton() {
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'gh-tldr-btn';
-  btn.title = 'Summarize this comment with AI';
-  btn.appendChild(wandIcon());
+// Borrow the neighbouring entry's classes so the new one inherits whatever
+// GitHub styles menu items with today, in either menu implementation.
+function makeMenuItem(reference) {
+  const item = document.createElement('button');
+  item.type = 'button';
+  item.className = `${reference.className} ${MENU_ITEM_CLASS}`.trim();
+  item.setAttribute('role', reference.getAttribute('role') || 'menuitem');
+  item.title = 'Summarize this comment with AI';
+
+  // Only carry an icon if the menu it is joining uses them.
+  if (reference.querySelector('svg')) item.appendChild(wandIcon());
+
   const label = document.createElement('span');
   label.className = 'gh-tldr-label';
   label.textContent = 'TLDR';
-  btn.appendChild(label);
-  return btn;
+  item.appendChild(label);
+  return item;
+}
+
+// The entry may be wrapped in a layout span; insert after the outermost
+// wrapper that still sits inside the menu, so we land beside it rather than
+// inside its box.
+function outerCell(item) {
+  let cell = item;
+  while (
+    cell.parentElement &&
+    cell.parentElement !== document.body &&
+    cell.parentElement.children.length === 1 &&
+    !MENU_SELECTORS.some((sel) => cell.parentElement.matches(sel))
+  ) {
+    cell = cell.parentElement;
+  }
+  return cell;
+}
+
+function closeMenu(el) {
+  const details = el.closest('details');
+  if (details) {
+    details.open = false;
+    return;
+  }
+  el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
 }
 
 function makePanel() {
@@ -183,15 +204,13 @@ function setState(panel, cls, text) {
   panel.textContent = text;
 }
 
-async function summarize(btn, panel, body) {
+async function summarize(panel, body) {
   const text = textOf(body);
   if (!text) {
     setState(panel, 'gh-tldr-error', 'Nothing to summarize.');
     return;
   }
 
-  btn.disabled = true;
-  btn.classList.add('is-loading');
   setState(panel, 'gh-tldr-loading', 'Summarizing…');
 
   try {
@@ -204,11 +223,12 @@ async function summarize(btn, panel, body) {
     panel.dataset.loaded = '1';
   } catch (err) {
     setState(panel, 'gh-tldr-error', `TLDR failed: ${err.message}`);
-  } finally {
-    btn.disabled = false;
-    btn.classList.remove('is-loading');
   }
 }
+
+// Panels are created up front, one per comment, and remembered so a menu entry
+// can find the one it belongs to.
+const panels = new WeakMap();
 
 function attach(body) {
   if (body.hasAttribute(PROCESSED)) return;
@@ -216,64 +236,9 @@ function attach(body) {
 
   if (textOf(body).length < MIN_CHARS) return;
 
-  const container = commentContainerOf(body);
-  if (!container) return;
-
-  const btn = makeButton();
   const panel = makePanel();
-
-  let placed = false;
-
-  // Preferred: immediately left of the Member/Collaborator badge.
-  for (const sel of BADGE_ROW_SELECTORS) {
-    const row = container.querySelector(sel);
-    if (row) {
-      insertLeftmost(row, btn);
-      placed = true;
-      break;
-    }
-  }
-
-  // Classic and PR headers have no badge wrapper of their own; the badge sits
-  // beside .timeline-comment-actions in the row above it.
-  if (!placed) {
-    const actions = container.querySelector('.timeline-comment-actions');
-    if (actions && actions.parentElement) {
-      insertLeftmost(actions.parentElement, btn);
-      placed = true;
-    }
-  }
-
-  if (!placed) for (const sel of ACTION_SELECTORS) {
-    const actions = container.querySelector(sel);
-    if (actions) {
-      actions.insertBefore(btn, actions.firstChild);
-      placed = true;
-      break;
-    }
-  }
-
-  if (!placed) {
-    for (const sel of HEADER_SELECTORS) {
-      const header = container.querySelector(sel);
-      if (header) {
-        btn.classList.add('gh-tldr-btn--header');
-        header.appendChild(btn);
-        placed = true;
-        break;
-      }
-    }
-  }
-
-  // Last resort: its own row above the body.
-  if (!placed) {
-    const bar = document.createElement('div');
-    bar.className = 'gh-tldr-bar';
-    bar.appendChild(btn);
-    body.parentElement.insertBefore(bar, body);
-  }
-
   body.parentElement.insertBefore(panel, body);
+  panels.set(body, panel);
 
   // If this exact comment text was summarized before, show it straight away.
   // A miss (including an edited comment, whose text now hashes differently)
@@ -288,23 +253,74 @@ function attach(body) {
       panel.dataset.loaded = '1';
     })
     .catch(() => {}); // no background worker (or no cache) is not an error
+}
 
-  btn.addEventListener('click', (e) => {
+// The comment a menu belongs to. Classic menus sit inside the comment, so
+// climbing finds it; Primer portals its menus to the end of the document, so
+// there we climb from whatever was clicked to open it instead.
+let lastAnchor = null;
+
+function ownCommentOf(el) {
+  let node = el.parentElement;
+  while (node && node !== document.body) {
+    const bodies = commentBodiesIn(node);
+    if (bodies.length === 1) return bodies[0];
+    if (bodies.length > 1) return null; // a thread: ambiguous, give up
+    node = node.parentElement;
+  }
+  return null;
+}
+
+function commentForMenu(item) {
+  return (
+    ownCommentOf(item) ||
+    (lastAnchor && lastAnchor.isConnected ? ownCommentOf(lastAnchor) : null)
+  );
+}
+
+function addMenuEntry(quote) {
+  const cell = outerCell(quote);
+  const next = cell.nextElementSibling;
+  if (next && next.classList.contains(MENU_ITEM_CLASS)) return; // already there
+
+  const body = commentForMenu(quote);
+  if (!body) return;
+
+  attach(body); // a lazily rendered comment may not have been scanned yet
+  const panel = panels.get(body);
+  if (!panel) return;
+
+  const item = makeMenuItem(quote);
+  item.addEventListener('click', (e) => {
     e.preventDefault();
     e.stopPropagation();
-    // Once a summary exists, the button just toggles it.
+    closeMenu(item);
     if (panel.dataset.loaded === '1') {
       panel.hidden = !panel.hidden;
       return;
     }
-    summarize(btn, panel, body);
+    summarize(panel, body);
   });
+
+  cell.insertAdjacentElement('afterend', item);
+}
+
+// Menus are cheap to re-check and are re-rendered on every open, so this runs
+// on mutations and right after any click.
+function scanMenus() {
+  for (const sel of MENU_ITEM_SELECTORS) {
+    for (const candidate of document.querySelectorAll(sel)) {
+      if (candidate.classList.contains(MENU_ITEM_CLASS)) continue;
+      if (isQuoteReply(candidate)) addMenuEntry(candidate);
+    }
+  }
 }
 
 function scan() {
   for (const sel of BODY_SELECTORS) {
     for (const body of document.querySelectorAll(sel)) attach(body);
   }
+  scanMenus();
 }
 
 let pending = null;
@@ -315,6 +331,20 @@ const observer = new MutationObserver(() => {
     scan();
   }, 300);
 });
+
+// A portalled menu appears only once its trigger is clicked, and waiting for
+// the mutation debounce would show the menu before our entry. Re-check on the
+// next frames instead; the observer stays as the backstop.
+document.addEventListener(
+  'click',
+  (e) => {
+    const el = e.target instanceof Element ? e.target : null;
+    if (!el) return;
+    lastAnchor = el.closest('summary, button, [role="button"]') || el;
+    for (const delay of [0, 60, 200]) setTimeout(scanMenus, delay);
+  },
+  true
+);
 
 scan();
 observer.observe(document.body, { childList: true, subtree: true });

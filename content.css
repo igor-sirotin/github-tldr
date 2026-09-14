@@ -1,88 +1,14 @@
 /* GitHub TLDR — button + summary panel */
 
-.gh-tldr-btn {
-  --gh-tldr-surface: var(--bgColor-default, #ffffff);
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  justify-content: center;
-  font: 600 12px/20px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-  letter-spacing: 0.02em;
-  color: var(--fgColor-muted, #656d76);
-  border: 1px solid transparent;
-  border-radius: 6px;
-  padding: 2px 9px;
-  margin-right: 8px;
-  cursor: pointer;
-  vertical-align: middle;
-  align-self: center;
-  line-height: 20px;
-  box-sizing: border-box;
-  background:
-    linear-gradient(var(--gh-tldr-surface), var(--gh-tldr-surface)) padding-box,
-    linear-gradient(
-      90deg,
-      #0969da, #8250df, #bf3989, #bc4c00, #1a7f37, #0969da
-    ) border-box;
-  background-size: auto, 300% 100%;
-  background-position: 0 0, 0 50%;
-  animation: gh-tldr-sheen 35s linear infinite;
-  transition: color 140ms cubic-bezier(.2,.8,.2,1);
-}
-
-@keyframes gh-tldr-sheen {
-  to { background-position: 0 0, -200% 50%; }
-}
-
-.gh-tldr-btn:hover:not(:disabled) {
-  --gh-tldr-surface: var(--bgColor-neutral-muted, #f6f8fa);
-  color: var(--fgColor-default, #1f2328);
-  animation-duration: 11s;
-}
-
-.gh-tldr-btn:active:not(:disabled) {
-  transform: translateY(1px);
-}
-
-.gh-tldr-btn:focus-visible {
-  outline: 2px solid var(--fgColor-accent, #0969da);
-  outline-offset: 2px;
-}
-
-.gh-tldr-btn:disabled {
-  cursor: default;
-}
-
-.gh-tldr-btn .gh-tldr-wand {
-  width: 14px;
-  height: 14px;
+/* The entry clones the neighbouring menu item's classes, so GitHub styles it.
+   Only the icon needs anything from us, and it is kept inline so a menu whose
+   items are plain blocks is not forced into flex layout. */
+.gh-tldr-menu-item .gh-tldr-wand {
+  width: 16px;
+  height: 16px;
   flex: none;
-  display: block; /* kills the inline baseline gap under the glyph */
-}
-
-.gh-tldr-btn.is-loading {
-  color: var(--fgColor-muted, #656d76);
-  animation-duration: 7s;
-}
-
-.gh-tldr-btn.is-loading .gh-tldr-wand {
-  animation: gh-tldr-wave 1s ease-in-out infinite;
-  transform-origin: 30% 70%;
-}
-
-@keyframes gh-tldr-wave {
-  0%, 100% { transform: rotate(-12deg); }
-  50%      { transform: rotate(12deg); }
-}
-
-/* Placement only, no visual change: the React issue header is a flex row with
-   no action bar, so push the button to the trailing edge where controls sit. */
-.gh-tldr-btn--header {
-  margin-left: auto;
-}
-
-.gh-tldr-bar {
-  padding: 6px 16px 0;
+  vertical-align: text-bottom;
+  margin-right: 8px;
 }
 
 /* Panel */
@@ -162,9 +88,3 @@
   background: var(--fgColor-danger, #cf222e);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .gh-tldr-btn,
-  .gh-tldr-btn.is-loading .gh-tldr-wand {
-    animation: none;
-  }
-}
