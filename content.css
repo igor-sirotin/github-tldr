@@ -207,10 +207,12 @@
   pointer-events: none;
   opacity: 0;
   transition: opacity 140ms cubic-bezier(.2, .8, .2, 1);
-  /* Flat base under the blobs, and the only fill the entry paints — see the
-     hover rule below. `background-color`, not `background`, so it is not
-     mistakable for a blob's own gradient rule. */
-  background-color: var(--tldr-base);
+  /* No background of its own. The base colour belongs on the item, whose
+     background covers the BORDER box — the same box every other menu item
+     fills on hover. This element only covers the PADDING box, so a rectangle
+     painted here would sit inset from the host's own hover fills and its right
+     edge would not line up with them. The blobs it carries are blurred and
+     soft-edged, so their inset by the border width is invisible. */
 }
 
 /* Each blob's edge is a radial falloff in its OWN percentages, not a pixel
@@ -326,16 +328,14 @@
 .gh-tldr-menu-item:focus,
 .gh-tldr-menu-item:focus-visible,
 .gh-tldr-menu-item[aria-selected="true"] {
-  /* Suppress the host's own hover fill, but do not repaint one here. Exactly
-     one element may paint this fill, and it has to be the mesh: an element's
-     background covers its BORDER box, while an absolutely positioned child
-     covers its parent's PADDING box, so an item-level fill and the mesh are
-     two different rectangles whenever the host puts a border on the item —
-     and a larger mismatch again if anything moves the mesh's containing block.
-     The mesh carries --tldr-base itself, so nothing is lost by leaving the
-     item transparent. */
+  /* Exactly one element may paint this fill, and it has to be this one. An
+     element's background covers its BORDER box, which is the box every other
+     menu item fills on hover, so filling here lines up with them exactly. The
+     mesh can only cover the PADDING box, so a fill painted there would be
+     inset from its neighbours. Painting in both places gives two rectangles of
+     different sizes and a visible seam. */
   background-color: transparent !important;
-  background-image: none !important;
+  background-image: linear-gradient(var(--tldr-base), var(--tldr-base)) !important;
   outline: none;
 }
 

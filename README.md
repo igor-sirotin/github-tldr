@@ -117,13 +117,16 @@ Finding the right spot without knowing GitHub's class names:
   the label in an element of its own, that element is re-used rather than having
   another span nested inside it, and the icon's margin is dropped in ActionList,
   whose content element owns that gap.
-- **Let exactly one element paint the fill.** An element's background covers its
-  *border* box; an absolutely positioned child covers its parent's *padding*
-  box. So painting the base colour on both the item and the mesh produces two
-  rectangles of different sizes, and the seam shows as a band around the mesh.
-  The hover rule therefore only suppresses the host's own fill — it never
-  repaints one — and the mesh carries `--tldr-base` itself. A test asserts that
-  invariant against `content.css`, since it is not visible in the markup.
+- **Let exactly one element paint the fill, and let it be the item.** An
+  element's background covers its *border* box; an absolutely positioned child
+  covers its parent's *padding* box. Painting the base colour on both the item
+  and the mesh gives two rectangles of different sizes and a visible seam;
+  painting it only on the mesh gives one rectangle inset from every neighbouring
+  item, so its right edge does not line up with theirs. The item is the right
+  box, because that is the one GitHub's own hover fills use. The mesh carries no
+  background at all — only the blurred blobs, whose inset by the border width is
+  invisible. A test asserts that invariant against `content.css`, since nothing
+  in the markup reveals it.
 - **Give each entry its own phase.** `content.js` sets a random negative
   `--gh-tldr-phase` per entry, which every animation in `content.css` takes as
   its `animation-delay`. A negative delay starts an animation part-way through

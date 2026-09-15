@@ -105,17 +105,22 @@ const assert = (c, m) => { if (!c) { console.error('FAIL:', m); process.exitCode
 
 // --- stylesheet invariant ---
 // An element's background covers its BORDER box; an absolutely positioned child
-// covers its parent's PADDING box. So if both the item and the mesh paint the
-// base colour, they are two rectangles of different sizes and the seam shows.
-// Exactly one rule may paint it, and it must be the mesh.
+// covers its parent's PADDING box. Painting the base colour in both places
+// gives two rectangles of different sizes and a visible seam; painting it only
+// on the mesh gives one rectangle that is inset from every neighbouring item.
+// So exactly one rule may paint it, and it must be the item — the box GitHub's
+// own hover fills use.
 const css = fs.readFileSync(path.join(__dirname, '..', 'content.css'), 'utf8');
 const fills = css
   .split('}')
   .filter((block) => /background[^:]*:[^;]*--tldr-base/.test(block))
   .map((block) => block.split('{')[0].trim().split('\n').pop().trim());
 assert(fills.length === 1, `exactly one rule paints the base fill (got ${fills.length}: ${fills.join(' / ')})`);
-assert(fills[0] === '.gh-tldr-mesh', `and it is the mesh (got ${fills[0]})`);
-assert(/background-image: none !important/.test(css), "the item suppresses the host's fill without repainting one");
+assert(/gh-tldr-menu-item/.test(fills[0]) && !/gh-tldr-mesh/.test(fills[0]),
+  `and it is the item, whose box matches the neighbouring items (got ${fills[0]})`);
+const meshRule = css.slice(css.indexOf('.gh-tldr-mesh {'), css.indexOf('}', css.indexOf('.gh-tldr-mesh {')));
+assert(!/background(-color)?\s*:/.test(meshRule),
+  'the mesh paints no rectangle of its own, only the blurred blobs it carries');
 const entryIn = (root) => root.querySelector('.gh-tldr-entry');
 const actionable = (entry) => entry.querySelector('.gh-tldr-menu-item') || entry;
 const labelsIn = (menu) => [...menu.querySelectorAll('[role="menuitem"]')].map((el) => el.textContent.trim());

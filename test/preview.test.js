@@ -26,6 +26,17 @@ JSDOM.fromURL(file, { runScripts: 'dangerously', resources: 'usable', pretendToB
       assert(styled && styled.classList.contains('ActionList-content'),
         'the hover styling lands on the content element, not the li');
       assert(styled.dataset.tldrMenu === 'actionlist', 'tagged as the actionlist variant');
+
+      // jsdom computes no geometry, so compare the boxes by proxy: the element
+      // we fill must be the same kind of element, with the same classes, as the
+      // one a neighbouring item fills. Then its border box — and so the fill's
+      // right edge — is theirs.
+      const neighbour = [...list.querySelectorAll('.ActionList-content')].find((el) => el !== styled);
+      assert(neighbour, 'there is a neighbouring item to compare against');
+      assert(styled.tagName === neighbour.tagName, 'entry fills the same kind of element as its neighbours');
+      const ours = [...styled.classList].filter((c) => !c.startsWith('gh-tldr-')).sort().join(' ');
+      const theirs = [...neighbour.classList].filter((c) => !c.startsWith('js-')).sort().join(' ');
+      assert(ours === theirs, `and the same classes, so the same box (ours: "${ours}" vs "${theirs}")`);
       assert(entry.querySelector('.gh-tldr-wand').closest('.ActionList-item-visual'),
         'wand sits in the visual slot');
       assert(entry.querySelector('.gh-tldr-label').classList.contains('ActionList-item-label'),
