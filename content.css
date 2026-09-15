@@ -1,8 +1,321 @@
-/* GitHub TLDR — button + summary panel */
+/* GitHub TLDR — ... menu entry + summary panel */
 
-/* Nothing here styles the menu entry: it is a clone of a real GitHub menu item,
-   so GitHub's own rules apply to it. Adding anything would be the thing that
-   made it look out of place. */
+/* The entry clones the neighbouring menu item's classes, so GitHub styles it:
+   same height, padding, font, icon gap and hover geometry as Quote reply or
+   Delete. Everything below only re-colours it — the way Delete re-colours its
+   own foreground — and adds the hover accent. No layout, no sizing. */
+
+.gh-tldr-menu-item {
+  position: relative;
+  overflow: hidden;
+}
+
+/* Icon: same 16px box and currentColor GitHub gives menu-item octicons. */
+.gh-tldr-menu-item .gh-tldr-wand {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  vertical-align: text-bottom;
+  margin-right: 8px;
+  /* Stroked with the same four hues as the label, along the wand's diagonal.
+     SVG cannot take a CSS gradient as `stroke`, so content.js injects one
+     hidden <svg> paint server and the stop colours are set here. */
+  stroke: url(#gh-tldr-icon-gradient);
+  /* Octicons are filled shapes and GitHub's menu CSS sets fill on any svg in
+     a menu item; this one is a stroked Lucide glyph and must stay unfilled. */
+  fill: none;
+}
+
+.gh-tldr-stop-1 { stop-color: var(--tldr-1); }
+.gh-tldr-stop-2 { stop-color: var(--tldr-2); }
+.gh-tldr-stop-3 { stop-color: var(--tldr-3); }
+.gh-tldr-stop-4 { stop-color: var(--tldr-4); }
+
+/* Hovered, the fill carries the colour and the icon goes white with the text,
+   so it drops back to currentColor. */
+.gh-tldr-menu-item:hover .gh-tldr-wand,
+.gh-tldr-menu-item:focus .gh-tldr-wand,
+.gh-tldr-menu-item:focus-visible .gh-tldr-wand,
+.gh-tldr-menu-item[aria-selected="true"] .gh-tldr-wand {
+  stroke: currentColor;
+}
+
+/* Two colour roles. `--tldr-f*` are the hover mesh's seven points plus its
+   base — the supplied palette, used as given in both themes. `--tldr-*` are
+   the resting label's four hues: the same families, darkened for light
+   backgrounds and lightened for dark ones, because the palette itself is too
+   pale to read as 13px text on white. */
+.gh-tldr-menu-item,
+#gh-tldr-icon-gradient {
+  --tldr-base: #ffc599;
+  --tldr-f1: hsl(354, 94%, 60%);
+  --tldr-f2: hsl(328, 91%, 70%);
+  --tldr-f3: hsl(159, 94%, 63%);
+  --tldr-f4: hsl(35, 61%, 69%);
+  --tldr-f5: hsl(167, 84%, 78%);
+  --tldr-f6: hsl(315, 82%, 73%);
+  --tldr-f7: hsl(146, 94%, 62%);
+
+  --tldr-1: hsl(354, 72%, 44%);
+  --tldr-2: hsl(328, 72%, 40%);
+  --tldr-3: hsl(159, 72%, 28%);
+  --tldr-4: hsl(35, 72%, 33%);
+}
+
+/* Dark theme. Resting label: the same four families lightened — the
+   light-theme set would be too dim on #0d1117. Mesh: the same seven hues
+   deepened, since the pastel set glares against a dark menu. */
+@media (prefers-color-scheme: dark) {
+  .gh-tldr-menu-item,
+  #gh-tldr-icon-gradient {
+    --tldr-base: hsl(25, 40%, 22%);
+    --tldr-f1: hsl(354, 62%, 40%);
+    --tldr-f2: hsl(328, 55%, 40%);
+    --tldr-f3: hsl(159, 60%, 27%);
+    --tldr-f4: hsl(35, 45%, 33%);
+    --tldr-f5: hsl(167, 48%, 30%);
+    --tldr-f6: hsl(315, 50%, 38%);
+    --tldr-f7: hsl(146, 58%, 26%);
+    --tldr-1: hsl(354, 94%, 74%);
+    --tldr-2: hsl(328, 91%, 78%);
+    --tldr-3: hsl(159, 84%, 62%);
+    --tldr-4: hsl(35, 90%, 68%);
+  }
+}
+
+/* Explicit dark opt-in. `data-dark-theme` is deliberately not matched: GitHub
+   sets it on every page, light or not, to name which theme dark would use. */
+[data-color-mode="dark"] .gh-tldr-menu-item,
+[data-color-mode="dark"] #gh-tldr-icon-gradient,
+[data-preview-theme="dark"] .gh-tldr-menu-item,
+[data-preview-theme="dark"] #gh-tldr-icon-gradient {
+  --tldr-base: hsl(25, 40%, 22%);
+  --tldr-f1: hsl(354, 62%, 40%);
+  --tldr-f2: hsl(328, 55%, 40%);
+  --tldr-f3: hsl(159, 60%, 27%);
+  --tldr-f4: hsl(35, 45%, 33%);
+  --tldr-f5: hsl(167, 48%, 30%);
+  --tldr-f6: hsl(315, 50%, 38%);
+  --tldr-f7: hsl(146, 58%, 26%);
+  --tldr-1: hsl(354, 94%, 74%);
+  --tldr-2: hsl(328, 91%, 78%);
+  --tldr-3: hsl(159, 84%, 62%);
+  --tldr-4: hsl(35, 90%, 68%);
+}
+
+/* GitHub sets data-color-mode="light" explicitly when the user opts out. */
+[data-color-mode="light"] .gh-tldr-menu-item,
+[data-color-mode="light"] #gh-tldr-icon-gradient,
+[data-preview-theme="light"] .gh-tldr-menu-item,
+[data-preview-theme="light"] #gh-tldr-icon-gradient {
+  --tldr-base: #ffc599;
+  --tldr-f1: hsl(354, 94%, 60%);
+  --tldr-f2: hsl(328, 91%, 70%);
+  --tldr-f3: hsl(159, 94%, 63%);
+  --tldr-f4: hsl(35, 61%, 69%);
+  --tldr-f5: hsl(167, 84%, 78%);
+  --tldr-f6: hsl(315, 82%, 73%);
+  --tldr-f7: hsl(146, 94%, 62%);
+  --tldr-1: hsl(354, 72%, 44%);
+  --tldr-2: hsl(328, 72%, 40%);
+  --tldr-3: hsl(159, 72%, 28%);
+  --tldr-4: hsl(35, 72%, 33%);
+}
+
+/* Label at rest: a wide multi-hue ramp travelling through the glyphs. A strip
+   of text 35px wide cannot show a 2D mesh, so the resting state is the linear
+   version and the mesh is kept for the fill, which has room for it. Guarded,
+   so a browser without background-clip:text keeps ordinary menu-item text. */
+.gh-tldr-menu-item .gh-tldr-label {
+  position: relative;
+  z-index: 1;
+  background-image: linear-gradient(
+    90deg,
+    var(--tldr-1), var(--tldr-2), var(--tldr-3), var(--tldr-4),
+    var(--tldr-3), var(--tldr-2), var(--tldr-1)
+  );
+  background-size: 300% 100%;
+}
+
+@supports ((background-clip: text) or (-webkit-background-clip: text)) {
+  .gh-tldr-menu-item .gh-tldr-label {
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: gh-tldr-ramp 8s linear infinite;
+  }
+}
+
+/* 300% size repeats every -150%, so two tiles land exactly on the start. */
+@keyframes gh-tldr-ramp {
+  to { background-position: -300% 50%; }
+}
+
+.gh-tldr-menu-item .gh-tldr-wand {
+  position: relative;
+  z-index: 1;
+}
+
+/* Hover fill: an animated mesh gradient. Seven colour blobs are real elements
+   (built by content.js), each a blurred circle on its own path at its own
+   duration, inside a clipping frame over an opaque base.
+   Blobs rather than layered radial-gradients: a gradient's soft edge is a
+   colour ramp in one tile, so overlapping seven of them in a 28px strip means
+   fighting tile arithmetic, and any shared keyframe timeline eventually
+   collapses them onto one point. Separate elements interpolate `transform`,
+   which is cheap, continuous and independent per blob, and a real `blur()`
+   melts the overlaps into one another the way a mesh gradient should. */
+.gh-tldr-mesh {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 140ms cubic-bezier(.2, .8, .2, 1);
+  /* Flat base under the blobs. `background-color`, not `background`, so it is
+     not mistakable for a blob's own gradient rule. */
+  background-color: var(--tldr-base);
+}
+
+/* Each blob's edge is a radial falloff in its OWN percentages, not a pixel
+   blur: a fixed `blur()` is a constant number of pixels, so it softens a 92px
+   blob on a real menu item but leaves a visible disc arc on a large one. This
+   way the softness is identical at any size, and the preview's magnified demo
+   is a true picture of the 28px original. The small blur on top only removes
+   banding. `will-change` keeps the seven independent animations on the
+   compositor. */
+.gh-tldr-blob {
+  position: absolute;
+  top: 50%;
+  width: 60%;
+  aspect-ratio: 1;
+  margin: -30% 0 0 -30%;
+  filter: blur(6px);
+  will-change: transform;
+}
+
+.gh-tldr-blob:nth-child(1) {
+  left: 7%;
+  background: radial-gradient(circle closest-side, var(--tldr-f1) 0%, var(--tldr-f1) 22%, transparent 78%);
+  animation: gh-tldr-blob-1 9s ease-in-out infinite alternate;
+}
+
+.gh-tldr-blob:nth-child(2) {
+  left: 16%;
+  background: radial-gradient(circle closest-side, var(--tldr-f2) 0%, var(--tldr-f2) 22%, transparent 78%);
+  animation: gh-tldr-blob-2 13s ease-in-out infinite alternate;
+}
+
+.gh-tldr-blob:nth-child(3) {
+  left: 26%;
+  background: radial-gradient(circle closest-side, var(--tldr-f3) 0%, var(--tldr-f3) 22%, transparent 78%);
+  animation: gh-tldr-blob-3 11s ease-in-out infinite alternate;
+}
+
+.gh-tldr-blob:nth-child(4) {
+  left: 38%;
+  background: radial-gradient(circle closest-side, var(--tldr-f4) 0%, var(--tldr-f4) 22%, transparent 78%);
+  animation: gh-tldr-blob-4 15s ease-in-out infinite alternate;
+}
+
+.gh-tldr-blob:nth-child(5) {
+  left: 56%;
+  background: radial-gradient(circle closest-side, var(--tldr-f5) 0%, var(--tldr-f5) 22%, transparent 78%);
+  animation: gh-tldr-blob-5 10s ease-in-out infinite alternate;
+}
+
+.gh-tldr-blob:nth-child(6) {
+  left: 74%;
+  background: radial-gradient(circle closest-side, var(--tldr-f6) 0%, var(--tldr-f6) 22%, transparent 78%);
+  animation: gh-tldr-blob-6 14s ease-in-out infinite alternate;
+}
+
+.gh-tldr-blob:nth-child(7) {
+  left: 94%;
+  background: radial-gradient(circle closest-side, var(--tldr-f7) 0%, var(--tldr-f7) 22%, transparent 78%);
+  animation: gh-tldr-blob-7 12s ease-in-out infinite alternate;
+}
+
+/* Paths are in percentages of the blob, so they scale with the item. Each
+   duration is different, so the seven points keep recombining and never line
+   up on a shared phase. */
+@keyframes gh-tldr-blob-1 {
+  50%  { transform: translate(56%, -28%) scale(1.15); }
+  100% { transform: translate(22%, 26%) scale(0.95); }
+}
+
+@keyframes gh-tldr-blob-2 {
+  50%  { transform: translate(-44%, 28%) scale(1.1); }
+  100% { transform: translate(36%, -24%) scale(1.2); }
+}
+
+@keyframes gh-tldr-blob-3 {
+  50%  { transform: translate(46%, 26%) scale(1.2); }
+  100% { transform: translate(-28%, -28%) scale(1); }
+}
+
+@keyframes gh-tldr-blob-4 {
+  50%  { transform: translate(-38%, -26%) scale(0.95); }
+  100% { transform: translate(-60%, 24%) scale(1.15); }
+}
+
+@keyframes gh-tldr-blob-5 {
+  50%  { transform: translate(34%, 30%) scale(1.1); }
+  100% { transform: translate(-42%, -22%) scale(1.2); }
+}
+
+@keyframes gh-tldr-blob-6 {
+  50%  { transform: translate(-52%, 22%) scale(1.15); }
+  100% { transform: translate(28%, -30%) scale(0.95); }
+}
+
+@keyframes gh-tldr-blob-7 {
+  50%  { transform: translate(-30%, -30%) scale(1.2); }
+  100% { transform: translate(-58%, 26%) scale(1.1); }
+}
+
+/* Hover: standard menu items take a solid fill, so this one does too — here
+   the drifting mesh — and the label and icon turn white with it, the way every
+   other item's foreground flips. */
+.gh-tldr-menu-item:hover,
+.gh-tldr-menu-item:focus,
+.gh-tldr-menu-item:focus-visible,
+.gh-tldr-menu-item[aria-selected="true"] {
+  background-color: transparent !important;
+  background-image: linear-gradient(var(--tldr-base), var(--tldr-base)) !important;
+  color: #ffffff !important;
+  outline: none;
+}
+
+.gh-tldr-menu-item:hover .gh-tldr-mesh,
+.gh-tldr-menu-item:focus .gh-tldr-mesh,
+.gh-tldr-menu-item:focus-visible .gh-tldr-mesh,
+.gh-tldr-menu-item[aria-selected="true"] .gh-tldr-mesh {
+  opacity: 1;
+}
+
+.gh-tldr-menu-item:hover .gh-tldr-label,
+.gh-tldr-menu-item:focus .gh-tldr-label,
+.gh-tldr-menu-item:focus-visible .gh-tldr-label,
+.gh-tldr-menu-item[aria-selected="true"] .gh-tldr-label {
+  background-image: none;
+  color: #ffffff;
+  -webkit-text-fill-color: #ffffff;
+  animation: none;
+}
+
+.gh-tldr-menu-item:active {
+  transform: translateY(1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gh-tldr-menu-item .gh-tldr-label,
+  .gh-tldr-blob {
+    animation: none;
+  }
+}
 
 /* Panel */
 
@@ -23,11 +336,10 @@
   position: absolute;
   inset: 0 0 auto;
   height: 2px;
-  background: linear-gradient(
-    90deg,
-    #0969da, #8250df, #bf3989, #bc4c00, #1a7f37
-  );
+  background: linear-gradient(90deg, hsl(354, 94%, 60%), hsl(328, 91%, 70%), hsl(35, 61%, 69%), hsl(159, 94%, 63%), hsl(167, 84%, 78%));
 }
+
+/* The palette reads on either surface, so the hairline needs no theme split. */
 
 .gh-tldr-title {
   font: 500 11px/1 ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
@@ -80,4 +392,3 @@
 .gh-tldr-error::before {
   background: var(--fgColor-danger, #cf222e);
 }
-

@@ -42,7 +42,8 @@ const dom = new JSDOM(`<!doctype html><body>
   </div>
 
   <div class="js-comment-container" id="comment-short">
-    <div class="comment-body js-comment-body">too short</div>
+    <div class="timeline-comment-header">${classicMenu('short')}</div>
+    <div class="comment-body js-comment-body">LGTM</div>
   </div>
 
   <!-- A PR review thread: three comments sharing one .js-comment-container. -->
@@ -88,8 +89,8 @@ vm.runInContext(fs.readFileSync(SRC, 'utf8'), ctx);
 
 const doc = dom.window.document;
 const assert = (c, m) => { if (!c) { console.error('FAIL:', m); process.exitCode = 1; } else console.log('ok -', m); };
-const entryIn = (root) => root.querySelector('.gh-tldr-menu-item');
-const actionable = (entry) => entry.querySelector('[role="menuitem"]') || entry;
+const entryIn = (root) => root.querySelector('.gh-tldr-entry');
+const actionable = (entry) => entry.querySelector('.gh-tldr-menu-item') || entry;
 const labelsIn = (menu) => [...menu.querySelectorAll('[role="menuitem"]')].map((el) => el.textContent.trim());
 
 // --- the menu entry, classic inline menus ---
@@ -116,10 +117,32 @@ assert(actionable(entryA).getAttribute('role') === 'menuitem', 'entry is exposed
 assert(entryA.textContent.trim() === 'TLDR', `label reads TLDR and nothing else (got ${JSON.stringify(entryA.textContent.trim())})`);
 assert(!entryA.textContent.includes('Quote'), 'the cloned label is gone');
 
+// --- the design: gradient label, gradient icon, mesh hover fill ---
+assert(actionable(entryA).classList.contains('gh-tldr-menu-item'),
+  'the styled class lands on the element GitHub hovers, not the layout wrapper');
+const labelEl = entryA.querySelector('.gh-tldr-label');
+assert(labelEl && labelEl.textContent === 'TLDR', 'label is wrapped so the gradient has something to paint');
+
+const mesh = actionable(entryA).querySelector('.gh-tldr-mesh');
+assert(mesh, 'hover mesh is built into the entry');
+assert(mesh.querySelectorAll('.gh-tldr-blob').length === 7, 'mesh has the seven blobs the design animates');
+assert(mesh.getAttribute('aria-hidden') === 'true', 'mesh is decorative');
+assert(actionable(entryA).firstElementChild === mesh, 'mesh sits behind the icon and label');
+
+const paint = doc.getElementById('gh-tldr-icon-gradient');
+assert(paint, 'a gradient paint server is injected for the icon stroke');
+assert(paint.tagName.toLowerCase() === 'lineargradient', 'paint server is a linearGradient');
+const stops = paint.querySelectorAll('stop');
+assert(stops.length === 4, `gradient has four stops (got ${stops.length})`);
+assert([...stops].every((st, i) => st.getAttribute('class') === `gh-tldr-stop-${i + 1}`),
+  'stops carry the classes content.css colours them with');
+assert(doc.querySelectorAll('#gh-tldr-icon-gradient').length === 1, 'only one paint server for the whole page');
+
 // Icon: same slot, same sizing, wand glyph.
 const wand = entryA.querySelector('svg');
 assert(wand && wand.classList.contains('gh-tldr-wand'), 'entry carries the wand glyph');
 assert(wand.classList.contains('octicon'), "it keeps GitHub's octicon class so it is sized and spaced natively");
+assert(wand.closest('.gh-tldr-menu-item'), 'wand is inside the styled item, so the gradient stroke rule matches');
 assert(!wand.classList.contains('octicon-quote'), "but not the original glyph's specific class");
 assert(wand.getAttribute('width') === '16' && wand.getAttribute('height') === '16', 'icon keeps the real item dimensions');
 assert(wand.querySelectorAll('path').length === 8, 'and is the full lucide wand, not the cloned path');
@@ -134,15 +157,22 @@ assert(doc.querySelectorAll('.gh-tldr-btn').length === 0, 'no injected button re
 assert(entryIn(doc.querySelector('#b-details details-menu')), 'second comment gets its own entry');
 for (const n of [1, 2]) {
   const reply = doc.getElementById('discussion_r' + n);
-  assert(reply.querySelectorAll('.gh-tldr-menu-item').length === 1, `thread reply ${n} has exactly one entry`);
+  assert(reply.querySelectorAll('.gh-tldr-entry').length === 1, `thread reply ${n} has exactly one entry`);
 }
-assert(!doc.querySelector('#comment-short .gh-tldr-menu-item'), 'short comment gets no entry');
+// A short comment still gets the entry: it costs no space until the menu is
+// opened, and going missing reads as the extension being broken. Only the
+// up-front cache lookup is skipped for it.
+const shortEntry = doc.querySelector('#comment-short .gh-tldr-entry');
+assert(shortEntry, 'a short comment is still offered the entry');
+assert(!doc.querySelector('#comment-short .gh-tldr-panel'), 'but no panel is built until it is actually used');
+assert(sent.filter((m) => m.type === 'peek').length === 5,
+  `the cache is peeked only for the five long comments, not the short one (got ${sent.filter((m) => m.type === 'peek').length})`);
 
 (async () => {
   // Reopening a menu must not stack a second entry into it.
   doc.getElementById('a-kebab').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
   await new Promise((r) => setTimeout(r, 300));
-  assert(menuA.querySelectorAll('.gh-tldr-menu-item').length === 1, 'reopening the menu does not duplicate the entry');
+  assert(menuA.querySelectorAll('.gh-tldr-entry').length === 1, 'reopening the menu does not duplicate the entry');
 
   // --- clicking the entry summarizes the right comment ---
   const bodyA = doc.querySelector('#comment-a .js-comment-body');
@@ -163,6 +193,16 @@ assert(!doc.querySelector('#comment-short .gh-tldr-menu-item'), 'short comment g
   await new Promise((r) => setTimeout(r, 20));
   assert(panelA.hidden === true && sent.filter((m) => m.type === 'tldr').length === 1, 'choosing it again hides the panel, no second request');
 
+  // Choosing TLDR on a short comment builds its panel on demand.
+  const shortBefore = sent.filter((m) => m.type === 'tldr').length;
+  actionable(doc.querySelector('#comment-short .gh-tldr-entry')).dispatchEvent(
+    new dom.window.MouseEvent('click', { bubbles: true })
+  );
+  await new Promise((r) => setTimeout(r, 30));
+  const shortPanel = doc.querySelector('#comment-short .gh-tldr-panel');
+  assert(shortPanel, 'the panel is created when the short comment is actually summarized');
+  assert(sent.filter((m) => m.type === 'tldr').length === shortBefore + 1, 'and the summary is requested');
+
   // --- portalled menu: resolved through the trigger that opened it ---
   const issueBody = doc.querySelector('[data-testid="markdown-body"]');
   const portal = doc.createElement('div');
@@ -174,12 +214,12 @@ assert(!doc.querySelector('#comment-short .gh-tldr-menu-item'), 'short comment g
   doc.body.appendChild(portal); // Primer renders the menu at the end of the document
   await new Promise((r) => setTimeout(r, 300));
 
-  const portalEntry = portal.querySelector('.gh-tldr-menu-item');
+  const portalEntry = portal.querySelector('.gh-tldr-entry');
   assert(portalEntry, 'portalled menu gets an entry too');
   assert(portalEntry.previousElementSibling === portal.querySelector('.js-comment-quote-reply'), 'entry follows Quote reply in the portalled menu');
   assert(portalEntry.querySelector('svg.gh-tldr-wand'), 'icon is included, because this menu uses icons');
 
-  portalEntry.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+  actionable(portalEntry).dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
   await new Promise((r) => setTimeout(r, 30));
   const last = sent.filter((m) => m.type === 'tldr').pop();
   assert(last.text.includes('The issue description'), 'portalled entry summarizes the comment whose kebab was clicked');

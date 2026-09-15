@@ -35,7 +35,9 @@ scripts on github.com.
   comments.
 - `background.js` reads the settings and calls
   `POST {baseUrl}/chat/completions`, returning the summary to the content script.
-- Comments shorter than 120 characters get no entry; comment text is truncated
+- Every comment is offered the entry regardless of length. Only the up-front
+  cache lookup is limited to comments over 120 characters, and a comment's panel
+  is not built until its entry is actually used; comment text is truncated
   to 12k characters before being sent.
 
 ## Model choice
@@ -101,6 +103,13 @@ Finding the right spot without knowing GitHub's class names:
   enough: any wrapper or attribute GitHub styles on is lost and native button
   chrome shows through. Cloning means the extension ships **no** menu styling at
   all, so the entry cannot drift from its neighbours.
+- **Re-colour, don't re-layout.** `content.css` sets no geometry on the entry at
+  all — height, padding, font and icon gap are GitHub's. It only adds colour:
+  the label carries an animated multi-hue ramp via `background-clip: text`, the
+  wand is stroked from an SVG paint server (`#gh-tldr-icon-gradient`, one hidden
+  `<svg>` per page, its stop colours set from CSS), and hovering swaps GitHub's
+  flat fill for an animated mesh of seven independently drifting colour blobs.
+  Both palettes have light and dark variants.
 - **Strip what belonged to Quote reply.** Ids (which must stay unique), `js-`
   behaviour hooks, `data-testid`, `href`/`value`/`for` and dangling
   `aria-labelledby` are all removed from the clone. The wand keeps the original

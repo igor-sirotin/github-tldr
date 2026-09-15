@@ -13,26 +13,35 @@ JSDOM.fromURL(file, { runScripts: 'dangerously', resources: 'usable', pretendToB
     const click = (el) => el.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
 
     const menus = doc.querySelectorAll('details-menu');
-    assert(menus.length === 7, `every mock comment has a menu (got ${menus.length})`);
-    assert(doc.querySelectorAll('.gh-tldr-menu-item').length === 7, 'every menu gets a TLDR entry');
+    assert(menus.length === 8, `every mock comment has a menu, plus the always-open demo (got ${menus.length})`);
+    assert(doc.querySelectorAll('.gh-tldr-entry').length === 8, 'every menu gets a TLDR entry');
     assert(doc.querySelectorAll('.gh-tldr-btn').length === 0, 'no injected buttons remain in the preview');
+
+    // The design's inspection aids.
+    const open = doc.querySelector('.states .open-menu');
+    assert(open && open.querySelector('.gh-tldr-entry'), 'the always-open menu shows the entry without clicking');
+    const demo = doc.getElementById('fill-demo');
+    assert(demo && demo.querySelectorAll('.gh-tldr-blob').length === 7, 'the magnified hover-fill demo is present');
+    assert(doc.getElementById('gh-tldr-icon-gradient'), 'the icon gradient paint server is injected');
     assert(doc.querySelector('link[href="content.css"]'), 'preview links the real stylesheet');
 
     for (const menu of menus) {
       const labels = [...menu.querySelectorAll('[role="menuitem"]')].map((el) => el.textContent.trim());
       assert(labels[labels.indexOf('Quote reply') + 1] === 'TLDR', `TLDR follows Quote reply (${labels.join(' | ')})`);
-      const entry = menu.querySelector('.gh-tldr-menu-item');
+      const entry = menu.querySelector('.gh-tldr-entry');
       assert(entry.compareDocumentPosition(menu.querySelector('.dropdown-divider')) & 4, 'entry is in the first section');
       const sibling = menu.querySelector('.js-comment-quote-reply').parentElement;
       assert(entry.tagName === sibling.tagName, 'entry matches the wrapper element of a real item');
-      assert(entry.querySelector('svg.gh-tldr-wand.octicon'), 'entry carries the wand in the native icon slot');
+      assert(entry.querySelector('svg.gh-tldr-wand'), 'entry carries the wand in the native icon slot');
+      assert(entry.querySelector('.gh-tldr-label').textContent === 'TLDR', 'label is wrapped for the gradient');
+      assert(entry.querySelectorAll('.gh-tldr-blob').length === 7, 'entry carries the seven-blob hover mesh');
     }
 
     // Each thread reply keeps its own entry and its own panel.
     const replies = doc.querySelectorAll('review-thread-collapsible .js-comment.review-comment');
     assert(replies.length === 3, 'thread mock has three comments');
     for (const [n, reply] of [...replies].entries()) {
-      assert(reply.querySelectorAll('.gh-tldr-menu-item').length === 1, `thread reply ${n + 1} has exactly one entry`);
+      assert(reply.querySelectorAll('.gh-tldr-entry').length === 1, `thread reply ${n + 1} has exactly one entry`);
     }
 
     // The pre-seeded comment still opens on load, with no interaction at all.
@@ -45,7 +54,7 @@ JSDOM.fromURL(file, { runScripts: 'dangerously', resources: 'usable', pretendToB
     const first = doc.querySelector('details-menu');
     const panel = first.closest('.timeline-comment').querySelector('.gh-tldr-panel');
     assert(panel.hidden === true, 'uncached comment starts closed');
-    click(first.querySelector('.gh-tldr-menu-item [role="menuitem"]'));
+    click(first.querySelector('.gh-tldr-entry .gh-tldr-menu-item'));
     assert(first.closest('details').open === false, 'menu closes on choosing TLDR');
     await new Promise((r) => setTimeout(r, 1100));
     assert(panel.hidden === false, 'stubbed summary renders');
@@ -54,7 +63,7 @@ JSDOM.fromURL(file, { runScripts: 'dangerously', resources: 'usable', pretendToB
 
     // The stub fails every second call, so the next one shows the error state.
     const second = doc.querySelectorAll('details-menu')[1];
-    click(second.querySelector('.gh-tldr-menu-item [role="menuitem"]'));
+    click(second.querySelector('.gh-tldr-entry .gh-tldr-menu-item'));
     await new Promise((r) => setTimeout(r, 1100));
     assert(second.closest('.timeline-comment').querySelector('.gh-tldr-panel').className.includes('gh-tldr-error'),
       'second choice reaches the error state');

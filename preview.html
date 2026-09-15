@@ -2,7 +2,7 @@
 <html lang="en" data-preview-theme="light">
 <head>
 <meta charset="utf-8">
-<title>GitHub TLDR — button preview</title>
+<title>GitHub TLDR — menu entry preview</title>
 <!-- The real extension stylesheet. Nothing here is loaded by the extension itself. -->
 <link rel="stylesheet" href="content.css">
 <style>
@@ -15,6 +15,7 @@
     --fgColor-muted: #59636e;
     --fgColor-accent: #0969da;
     --fgColor-danger: #cf222e;
+    --bgColor-accent-emphasis: #0969da;
   }
   [data-preview-theme="dark"] {
     --bgColor-default: #0d1117;
@@ -25,6 +26,7 @@
     --fgColor-muted: #9198a1;
     --fgColor-accent: #4493f8;
     --fgColor-danger: #f85149;
+    --bgColor-accent-emphasis: #1f6feb;
     color-scheme: dark;
   }
   body {
@@ -77,6 +79,7 @@
     border: 1px solid var(--borderColor-default); border-radius: 999px;
     color: var(--fgColor-muted);
   }
+  [hidden] { display: none !important; }
   .js-comment-body { padding: 16px; display: grid; gap: 12px; }
   .js-comment-body p { margin: 0; }
   .js-comment-body code {
@@ -97,29 +100,46 @@
   [data-testid="issue-body-viewer"] { padding: 16px; display: grid; gap: 12px; }
   [data-testid="issue-body-viewer"] p { margin: 0; }
 
+  /* Classic details-menu, close to GitHub's own metrics: 8px/12px padding,
+     16px leading octicon, 8px gap, accent fill on hover. */
   .tldr-menu { position: relative; display: inline-block; }
   .tldr-menu > summary { list-style: none; cursor: pointer; padding: 0 6px; border-radius: 6px; color: var(--fgColor-muted); }
   .tldr-menu > summary::-webkit-details-marker { display: none; }
   .tldr-menu > summary:hover { background: var(--bgColor-neutral-muted); color: var(--fgColor-default); }
   .dropdown-menu {
-    position: absolute; right: 0; top: 100%; z-index: 20; min-width: 185px;
-    display: block; padding: 4px 0; margin-top: 4px;
+    position: absolute; right: 0; top: 100%; z-index: 20; min-width: 200px;
+    display: block; padding: 4px; margin-top: 4px;
     background: var(--bgColor-default); border: 1px solid var(--borderColor-default);
     border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,.16); text-align: left;
   }
   .dropdown-item {
-    display: flex; align-items: center; gap: 8px;
-    width: 100%; padding: 6px 12px; border: 0; background: none;
-    font: 400 14px/20px inherit; color: var(--fgColor-default); text-align: left; cursor: pointer;
-    white-space: nowrap;
+    display: flex; align-items: center; width: 100%; padding: 6px 8px; border: 0;
+    border-radius: 6px; background: none;
+    font: 400 14px/20px inherit; color: var(--fgColor-default); text-align: left;
+    cursor: pointer; white-space: nowrap;
   }
-  .dropdown-item .octicon { flex: none; color: var(--fgColor-muted); }
-  .dropdown-item:hover { background: var(--fgColor-accent); color: #fff; }
-  .dropdown-item:hover .octicon { color: #fff; }
+  /* Octicons are filled; the extension's Lucide glyph is stroked, so it opts out. */
+  .dropdown-item svg:not(.gh-tldr-wand) { width: 16px; height: 16px; flex: none; margin-right: 8px; fill: currentColor; }
+  .dropdown-item:hover { background: var(--bgColor-accent-emphasis); color: #fff; }
+  .dropdown-item.danger { color: var(--fgColor-danger); }
+  .dropdown-item.danger:hover { background: var(--fgColor-danger); color: #fff; }
   .dropdown-divider { height: 1px; margin: 4px 0; background: var(--borderColor-default); }
 
-  .states { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; padding: 16px; background: var(--bgColor-default); border: 1px solid var(--borderColor-default); border-radius: 6px; }
-  .states .label { font: 500 11px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--fgColor-muted); width: 100%; }
+  .states { padding: 16px; background: var(--bgColor-default); border: 1px solid var(--borderColor-default); border-radius: 6px; }
+  .states .label { display: block; font: 500 11px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--fgColor-muted); margin-bottom: 12px; }
+  .states .open-menu { position: static; box-shadow: none; margin: 0; }
+  .states .hint { margin: 12px 0 0; font-size: 12px; color: var(--fgColor-muted); }
+  .states .hint button { font: inherit; color: var(--fgColor-default); background: var(--bgColor-default); border: 1px solid var(--borderColor-default); border-radius: 6px; padding: 1px 8px; margin-left: 6px; cursor: pointer; }
+
+  /* Fill demo: the real hover fill, shown large and always on. The mesh markup
+     matches what content.js builds, so the blobs, colours and animations come
+     straight from content.css — only the size and forced opacity are
+     preview-only. */
+  .tldr-fill-demo { display: block; height: 120px; border-radius: 6px; }
+  .tldr-fill-demo .gh-tldr-mesh { opacity: 1 !important; }
+  .tldr-fill-demo.is-paused .gh-tldr-blob { animation-play-state: paused; }
+  .states .legend { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 20px; margin: 12px 0 0; padding: 0; list-style: none; font-size: 12px; color: var(--fgColor-muted); }
+  .states .legend b { color: var(--fgColor-default); font-weight: 500; }
 </style>
 </head>
 <body>
@@ -134,45 +154,39 @@
     <button type="button" id="theme">Toggle theme</button>
   </div>
 
+  <!-- A permanently open menu, so the entry's design can be inspected (and
+       hovered) without clicking anything. Built from the same template as the
+       menus below, inside a comment long enough to qualify. -->
+  <div class="states timeline-comment js-comment-container">
+    <span class="label">Menu entry — always open</span>
+    <div class="tldr-menu-slot" data-open="1"></div>
+    <div class="js-comment-body" hidden>
+      This fixture exists only to give the always-open menu above a comment of its own, long
+      enough to pass the minimum-length check in the content script so that the TLDR entry is
+      actually added to it.
+    </div>
+    <p class="hint">Hover the entry to see the animated gradient fill. Compare against <em>Delete</em>, which recolours its foreground the same way.</p>
+  </div>
+
+  <div class="states">
+    <span class="label">Hover fill — shown large, always on</span>
+    <div class="gh-tldr-menu-item tldr-fill-demo" id="fill-demo"><span class="gh-tldr-mesh" aria-hidden="true"><span class="gh-tldr-blob"></span><span class="gh-tldr-blob"></span><span class="gh-tldr-blob"></span><span class="gh-tldr-blob"></span><span class="gh-tldr-blob"></span><span class="gh-tldr-blob"></span><span class="gh-tldr-blob"></span></span></div>
+    <ul class="legend">
+      <li><b>Seven blobs, seven timelines.</b> Each colour is its own element with its own path and duration (9–15s), so they never collapse onto one point.</li>
+      <li><b>Proportional falloff.</b> Each blob's edge is a radial ramp in its own percentages, so the softness is identical at 28px and at demo size — a fixed pixel blur would show disc arcs when magnified.</li>
+      <li><b>Transform-only motion.</b> Continuous, compositor-cheap, and independent per blob.</li>
+      <li><b>Clipping frame.</b> The mesh container is <code>inset: 0</code> with <code>overflow: hidden</code>, over an opaque base, so no frame can expose bare menu surface.</li>
+      <li><b>Blobs wider than the strip.</b> 60% of the width each, anchored at 7–94%, so every hue keeps its own patch while overlapping its neighbours.</li>
+      <li><b>Built in JS.</b> <code>content.js</code> appends the mesh span and seven blob spans; the CSS owns everything visual.</li>
+    </ul>
+    <p class="hint">At a real menu item's 28px height only a horizontal slice through the middle of this is visible. <button type="button" id="pause-demo">Pause</button></p>
+  </div>
+
   <div class="timeline-comment js-comment-container">
     <div class="timeline-comment-header">
       <strong>octocat</strong> commented on <span>2026-03-14</span>
       <div class="header-right">
-        <div class="timeline-comment-actions"><details class="tldr-menu"><summary title="Show options">···</summary>
-            <details-menu class="dropdown-menu" role="menu">
-              <span data-view-component="true">
-                <button type="button" class="dropdown-item btn-link " role="menuitem" data-view-component="true">
-                  <svg class="octicon octicon-link" width="16" height="16" aria-hidden="true" viewBox="0 0 16 16" fill="currentColor"><path d="M4 4h8v8H4z"/></svg>
-                  Copy link
-                </button>
-              </span>
-              <span data-view-component="true">
-                <button type="button" class="dropdown-item btn-link " role="menuitem" data-view-component="true">
-                  <svg class="octicon octicon-copy" width="16" height="16" aria-hidden="true" viewBox="0 0 16 16" fill="currentColor"><path d="M4 4h8v8H4z"/></svg>
-                  Copy Markdown
-                </button>
-              </span>
-              <span data-view-component="true">
-                <button type="button" class="dropdown-item btn-link js-comment-quote-reply" role="menuitem" data-view-component="true">
-                  <svg class="octicon octicon-quote" width="16" height="16" aria-hidden="true" viewBox="0 0 16 16" fill="currentColor"><path d="M4 4h8v8H4z"/></svg>
-                  Quote reply
-                </button>
-              </span>
-              <div class="dropdown-divider"></div>
-              <span data-view-component="true">
-                <button type="button" class="dropdown-item btn-link " role="menuitem" data-view-component="true">
-                  <svg class="octicon octicon-pencil" width="16" height="16" aria-hidden="true" viewBox="0 0 16 16" fill="currentColor"><path d="M4 4h8v8H4z"/></svg>
-                  Edit
-                </button>
-              </span>
-              <span data-view-component="true">
-                <button type="button" class="dropdown-item btn-link " role="menuitem" data-view-component="true">
-                  <svg class="octicon octicon-trash" width="16" height="16" aria-hidden="true" viewBox="0 0 16 16" fill="currentColor"><path d="M4 4h8v8H4z"/></svg>
-                  Delete
-                </button>
-              </span>
-            </details-menu>
-          </details></div>
+        <div class="timeline-comment-actions tldr-menu-slot"></div>
         <div><span class="Label">Member</span></div>
       </div>
     </div>
@@ -187,47 +201,13 @@
     <div class="timeline-comment-header">
       <strong>monalisa</strong> commented on <span>2026-03-15</span>
       <div class="header-right">
-        <div class="timeline-comment-actions"><details class="tldr-menu"><summary title="Show options">···</summary>
-            <details-menu class="dropdown-menu" role="menu">
-              <span data-view-component="true">
-                <button type="button" class="dropdown-item btn-link " role="menuitem" data-view-component="true">
-                  <svg class="octicon octicon-link" width="16" height="16" aria-hidden="true" viewBox="0 0 16 16" fill="currentColor"><path d="M4 4h8v8H4z"/></svg>
-                  Copy link
-                </button>
-              </span>
-              <span data-view-component="true">
-                <button type="button" class="dropdown-item btn-link " role="menuitem" data-view-component="true">
-                  <svg class="octicon octicon-copy" width="16" height="16" aria-hidden="true" viewBox="0 0 16 16" fill="currentColor"><path d="M4 4h8v8H4z"/></svg>
-                  Copy Markdown
-                </button>
-              </span>
-              <span data-view-component="true">
-                <button type="button" class="dropdown-item btn-link js-comment-quote-reply" role="menuitem" data-view-component="true">
-                  <svg class="octicon octicon-quote" width="16" height="16" aria-hidden="true" viewBox="0 0 16 16" fill="currentColor"><path d="M4 4h8v8H4z"/></svg>
-                  Quote reply
-                </button>
-              </span>
-              <div class="dropdown-divider"></div>
-              <span data-view-component="true">
-                <button type="button" class="dropdown-item btn-link " role="menuitem" data-view-component="true">
-                  <svg class="octicon octicon-pencil" width="16" height="16" aria-hidden="true" viewBox="0 0 16 16" fill="currentColor"><path d="M4 4h8v8H4z"/></svg>
-                  Edit
-                </button>
-              </span>
-              <span data-view-component="true">
-                <button type="button" class="dropdown-item btn-link " role="menuitem" data-view-component="true">
-                  <svg class="octicon octicon-trash" width="16" height="16" aria-hidden="true" viewBox="0 0 16 16" fill="currentColor"><path d="M4 4h8v8H4z"/></svg>
-                  Delete
-                </button>
-              </span>
-            </details-menu>
-          </details></div>
+        <div class="timeline-comment-actions tldr-menu-slot"></div>
         <div><span class="Label">Member</span></div>
       </div>
     </div>
     <div class="js-comment-body">
       <p>Agreed on the second option, but let's land the pinned output path first so the branch is usable this week. The split touches every import site and I would rather review that on its own. Also worth checking whether the CI cache key includes the configuration name — if it does not, we are paying for this twice on every merge queue run.</p>
-      <p>Try the error path in this preview by clicking the second comment's button: the stub fails on purpose.</p>
+      <p>Try the error path in this preview by using this comment's TLDR entry: the stub fails on purpose.</p>
     </div>
   </div>
 
@@ -235,41 +215,7 @@
     <div class="timeline-comment-header">
       <strong>hubot</strong> commented on <span>2026-03-16</span>
       <div class="header-right">
-        <div class="timeline-comment-actions"><details class="tldr-menu"><summary title="Show options">···</summary>
-            <details-menu class="dropdown-menu" role="menu">
-              <span data-view-component="true">
-                <button type="button" class="dropdown-item btn-link " role="menuitem" data-view-component="true">
-                  <svg class="octicon octicon-link" width="16" height="16" aria-hidden="true" viewBox="0 0 16 16" fill="currentColor"><path d="M4 4h8v8H4z"/></svg>
-                  Copy link
-                </button>
-              </span>
-              <span data-view-component="true">
-                <button type="button" class="dropdown-item btn-link " role="menuitem" data-view-component="true">
-                  <svg class="octicon octicon-copy" width="16" height="16" aria-hidden="true" viewBox="0 0 16 16" fill="currentColor"><path d="M4 4h8v8H4z"/></svg>
-                  Copy Markdown
-                </button>
-              </span>
-              <span data-view-component="true">
-                <button type="button" class="dropdown-item btn-link js-comment-quote-reply" role="menuitem" data-view-component="true">
-                  <svg class="octicon octicon-quote" width="16" height="16" aria-hidden="true" viewBox="0 0 16 16" fill="currentColor"><path d="M4 4h8v8H4z"/></svg>
-                  Quote reply
-                </button>
-              </span>
-              <div class="dropdown-divider"></div>
-              <span data-view-component="true">
-                <button type="button" class="dropdown-item btn-link " role="menuitem" data-view-component="true">
-                  <svg class="octicon octicon-pencil" width="16" height="16" aria-hidden="true" viewBox="0 0 16 16" fill="currentColor"><path d="M4 4h8v8H4z"/></svg>
-                  Edit
-                </button>
-              </span>
-              <span data-view-component="true">
-                <button type="button" class="dropdown-item btn-link " role="menuitem" data-view-component="true">
-                  <svg class="octicon octicon-trash" width="16" height="16" aria-hidden="true" viewBox="0 0 16 16" fill="currentColor"><path d="M4 4h8v8H4z"/></svg>
-                  Delete
-                </button>
-              </span>
-            </details-menu>
-          </details></div>
+        <div class="timeline-comment-actions tldr-menu-slot"></div>
         <div><span class="Label">Member</span></div>
       </div>
     </div>
@@ -281,6 +227,7 @@
       <p>Press "Clear cache" above to watch it go back to needing a click.</p>
     </div>
   </div>
+
   <!-- A PR review thread: several comments sharing one .js-comment-container. -->
   <review-thread-collapsible class="timeline-comment js-comment-container js-resolvable-timeline-thread-container">
     <div class="js-inline-comments-container">
@@ -288,94 +235,26 @@
         <div class="timeline-comment-header">
           <strong>hubot</strong> reviewed
           <div class="header-right">
-            <div class="timeline-comment-actions"><details class="tldr-menu"><summary title="Show options">···</summary>
-            <details-menu class="dropdown-menu" role="menu">
-              <span data-view-component="true">
-                <button type="button" class="dropdown-item btn-link " role="menuitem" data-view-component="true">
-                  <svg class="octicon octicon-link" width="16" height="16" aria-hidden="true" viewBox="0 0 16 16" fill="currentColor"><path d="M4 4h8v8H4z"/></svg>
-                  Copy link
-                </button>
-              </span>
-              <span data-view-component="true">
-                <button type="button" class="dropdown-item btn-link " role="menuitem" data-view-component="true">
-                  <svg class="octicon octicon-copy" width="16" height="16" aria-hidden="true" viewBox="0 0 16 16" fill="currentColor"><path d="M4 4h8v8H4z"/></svg>
-                  Copy Markdown
-                </button>
-              </span>
-              <span data-view-component="true">
-                <button type="button" class="dropdown-item btn-link js-comment-quote-reply" role="menuitem" data-view-component="true">
-                  <svg class="octicon octicon-quote" width="16" height="16" aria-hidden="true" viewBox="0 0 16 16" fill="currentColor"><path d="M4 4h8v8H4z"/></svg>
-                  Quote reply
-                </button>
-              </span>
-              <div class="dropdown-divider"></div>
-              <span data-view-component="true">
-                <button type="button" class="dropdown-item btn-link " role="menuitem" data-view-component="true">
-                  <svg class="octicon octicon-pencil" width="16" height="16" aria-hidden="true" viewBox="0 0 16 16" fill="currentColor"><path d="M4 4h8v8H4z"/></svg>
-                  Edit
-                </button>
-              </span>
-              <span data-view-component="true">
-                <button type="button" class="dropdown-item btn-link " role="menuitem" data-view-component="true">
-                  <svg class="octicon octicon-trash" width="16" height="16" aria-hidden="true" viewBox="0 0 16 16" fill="currentColor"><path d="M4 4h8v8H4z"/></svg>
-                  Delete
-                </button>
-              </span>
-            </details-menu>
-          </details></div>
+            <div class="timeline-comment-actions tldr-menu-slot"></div>
             <div><span class="Label">Member</span></div>
           </div>
         </div>
         <div class="js-comment-body">
-          <p>Review thread, first comment. Each comment in a thread needs its own button:
+          <p>Review thread, first comment. Each comment in a thread needs its own entry:
           they share one container, so a naive lookup finds the first header three times and
-          stacks every button there.</p>
+          stacks every entry there.</p>
         </div>
       </div>
       <div class="js-comment review-comment">
         <div class="timeline-comment-header">
           <strong>octocat</strong> replied
           <div class="header-right">
-            <div class="timeline-comment-actions"><details class="tldr-menu"><summary title="Show options">···</summary>
-            <details-menu class="dropdown-menu" role="menu">
-              <span data-view-component="true">
-                <button type="button" class="dropdown-item btn-link " role="menuitem" data-view-component="true">
-                  <svg class="octicon octicon-link" width="16" height="16" aria-hidden="true" viewBox="0 0 16 16" fill="currentColor"><path d="M4 4h8v8H4z"/></svg>
-                  Copy link
-                </button>
-              </span>
-              <span data-view-component="true">
-                <button type="button" class="dropdown-item btn-link " role="menuitem" data-view-component="true">
-                  <svg class="octicon octicon-copy" width="16" height="16" aria-hidden="true" viewBox="0 0 16 16" fill="currentColor"><path d="M4 4h8v8H4z"/></svg>
-                  Copy Markdown
-                </button>
-              </span>
-              <span data-view-component="true">
-                <button type="button" class="dropdown-item btn-link js-comment-quote-reply" role="menuitem" data-view-component="true">
-                  <svg class="octicon octicon-quote" width="16" height="16" aria-hidden="true" viewBox="0 0 16 16" fill="currentColor"><path d="M4 4h8v8H4z"/></svg>
-                  Quote reply
-                </button>
-              </span>
-              <div class="dropdown-divider"></div>
-              <span data-view-component="true">
-                <button type="button" class="dropdown-item btn-link " role="menuitem" data-view-component="true">
-                  <svg class="octicon octicon-pencil" width="16" height="16" aria-hidden="true" viewBox="0 0 16 16" fill="currentColor"><path d="M4 4h8v8H4z"/></svg>
-                  Edit
-                </button>
-              </span>
-              <span data-view-component="true">
-                <button type="button" class="dropdown-item btn-link " role="menuitem" data-view-component="true">
-                  <svg class="octicon octicon-trash" width="16" height="16" aria-hidden="true" viewBox="0 0 16 16" fill="currentColor"><path d="M4 4h8v8H4z"/></svg>
-                  Delete
-                </button>
-              </span>
-            </details-menu>
-          </details></div>
+            <div class="timeline-comment-actions tldr-menu-slot"></div>
             <div><span class="Label">Collaborator</span></div>
           </div>
         </div>
         <div class="js-comment-body">
-          <p>Second reply. This one should carry its own button in its own header, left of the
+          <p>Second reply. This one should carry its own entry in its own menu, left of the
           Collaborator badge, exactly like a top-level comment does.</p>
         </div>
       </div>
@@ -383,46 +262,12 @@
         <div class="timeline-comment-header">
           <strong>monalisa</strong> replied
           <div class="header-right">
-            <div class="timeline-comment-actions"><details class="tldr-menu"><summary title="Show options">···</summary>
-            <details-menu class="dropdown-menu" role="menu">
-              <span data-view-component="true">
-                <button type="button" class="dropdown-item btn-link " role="menuitem" data-view-component="true">
-                  <svg class="octicon octicon-link" width="16" height="16" aria-hidden="true" viewBox="0 0 16 16" fill="currentColor"><path d="M4 4h8v8H4z"/></svg>
-                  Copy link
-                </button>
-              </span>
-              <span data-view-component="true">
-                <button type="button" class="dropdown-item btn-link " role="menuitem" data-view-component="true">
-                  <svg class="octicon octicon-copy" width="16" height="16" aria-hidden="true" viewBox="0 0 16 16" fill="currentColor"><path d="M4 4h8v8H4z"/></svg>
-                  Copy Markdown
-                </button>
-              </span>
-              <span data-view-component="true">
-                <button type="button" class="dropdown-item btn-link js-comment-quote-reply" role="menuitem" data-view-component="true">
-                  <svg class="octicon octicon-quote" width="16" height="16" aria-hidden="true" viewBox="0 0 16 16" fill="currentColor"><path d="M4 4h8v8H4z"/></svg>
-                  Quote reply
-                </button>
-              </span>
-              <div class="dropdown-divider"></div>
-              <span data-view-component="true">
-                <button type="button" class="dropdown-item btn-link " role="menuitem" data-view-component="true">
-                  <svg class="octicon octicon-pencil" width="16" height="16" aria-hidden="true" viewBox="0 0 16 16" fill="currentColor"><path d="M4 4h8v8H4z"/></svg>
-                  Edit
-                </button>
-              </span>
-              <span data-view-component="true">
-                <button type="button" class="dropdown-item btn-link " role="menuitem" data-view-component="true">
-                  <svg class="octicon octicon-trash" width="16" height="16" aria-hidden="true" viewBox="0 0 16 16" fill="currentColor"><path d="M4 4h8v8H4z"/></svg>
-                  Delete
-                </button>
-              </span>
-            </details-menu>
-          </details></div>
+            <div class="timeline-comment-actions tldr-menu-slot"></div>
           </div>
         </div>
         <div class="js-comment-body">
-          <p>Third reply, with no author badge at all — the button still belongs at the left
-          end of this comment's own header row rather than in the one above.</p>
+          <p>Third reply, with no author badge at all — the entry still belongs in this
+          comment's own menu rather than in the one above.</p>
         </div>
       </div>
     </div>
@@ -435,49 +280,15 @@
         <strong>octocat</strong> opened this issue · Issue description (React view)
         <div class="IssueBodyHeader-module__badgesSection__demo" style="display:flex;align-items:center;gap:8px;margin-left:auto">
           <div class="IssueBodyHeader-module__badgeGroup__demo"><span class="Label">Collaborator</span></div>
-          <div class="IssueBodyHeader-module__actionsSection__demo"><details class="tldr-menu"><summary title="Show options">···</summary>
-            <details-menu class="dropdown-menu" role="menu">
-              <span data-view-component="true">
-                <button type="button" class="dropdown-item btn-link " role="menuitem" data-view-component="true">
-                  <svg class="octicon octicon-link" width="16" height="16" aria-hidden="true" viewBox="0 0 16 16" fill="currentColor"><path d="M4 4h8v8H4z"/></svg>
-                  Copy link
-                </button>
-              </span>
-              <span data-view-component="true">
-                <button type="button" class="dropdown-item btn-link " role="menuitem" data-view-component="true">
-                  <svg class="octicon octicon-copy" width="16" height="16" aria-hidden="true" viewBox="0 0 16 16" fill="currentColor"><path d="M4 4h8v8H4z"/></svg>
-                  Copy Markdown
-                </button>
-              </span>
-              <span data-view-component="true">
-                <button type="button" class="dropdown-item btn-link js-comment-quote-reply" role="menuitem" data-view-component="true">
-                  <svg class="octicon octicon-quote" width="16" height="16" aria-hidden="true" viewBox="0 0 16 16" fill="currentColor"><path d="M4 4h8v8H4z"/></svg>
-                  Quote reply
-                </button>
-              </span>
-              <div class="dropdown-divider"></div>
-              <span data-view-component="true">
-                <button type="button" class="dropdown-item btn-link " role="menuitem" data-view-component="true">
-                  <svg class="octicon octicon-pencil" width="16" height="16" aria-hidden="true" viewBox="0 0 16 16" fill="currentColor"><path d="M4 4h8v8H4z"/></svg>
-                  Edit
-                </button>
-              </span>
-              <span data-view-component="true">
-                <button type="button" class="dropdown-item btn-link " role="menuitem" data-view-component="true">
-                  <svg class="octicon octicon-trash" width="16" height="16" aria-hidden="true" viewBox="0 0 16 16" fill="currentColor"><path d="M4 4h8v8H4z"/></svg>
-                  Delete
-                </button>
-              </span>
-            </details-menu>
-          </details></div>
+          <div class="IssueBodyHeader-module__actionsSection__demo tldr-menu-slot"></div>
         </div>
       </div>
     </div>
     <div data-testid="issue-body-viewer">
       <div data-testid="markdown-body" class="markdown-body">
         <p>This block reproduces GitHub's React issue view, which has no comment action bar at
-        all — the header is a plain flex row. The button is appended to that header rather than
-        dropped into a strip above the text, which is what it used to do here.</p>
+        all — the header is a plain flex row. The menu is appended to that header rather than
+        dropped into a strip above the text.</p>
         <p>The class names carry a build hash on the real site, so the content script matches the
         stable module prefix instead of the full name.</p>
       </div>
@@ -485,7 +296,35 @@
   </div>
 </div>
 
+<!-- One menu definition, cloned into every slot. Items carry octicons, as they
+     do on GitHub — the content script only adds its own icon when the menu it
+     joins uses them. -->
+<template id="menu-template">
+  <details class="tldr-menu"><summary title="Show options">···</summary>
+    <details-menu class="dropdown-menu" role="menu">
+      <span><button type="button" class="dropdown-item" role="menuitem"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M7.775 3.275a.75.75 0 0 0 1.06 1.06l1.25-1.25a2 2 0 1 1 2.83 2.83l-2.5 2.5a2 2 0 0 1-2.83 0 .75.75 0 0 0-1.06 1.06 3.5 3.5 0 0 0 4.95 0l2.5-2.5a3.5 3.5 0 0 0-4.95-4.95l-1.25 1.25Zm-4.69 9.64a2 2 0 0 1 0-2.83l2.5-2.5a2 2 0 0 1 2.83 0 .75.75 0 0 0 1.06-1.06 3.5 3.5 0 0 0-4.95 0l-2.5 2.5a3.5 3.5 0 0 0 4.95 4.95l1.25-1.25a.75.75 0 0 0-1.06-1.06l-1.25 1.25a2 2 0 0 1-2.83 0Z"/></svg>Copy link</button></span>
+      <span><button type="button" class="dropdown-item" role="menuitem"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z"/><path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z"/></svg>Copy Markdown</button></span>
+      <span><button type="button" class="dropdown-item js-comment-quote-reply" role="menuitem"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.75 2.5h12.5a.25.25 0 0 1 .25.25v8.5a.25.25 0 0 1-.25.25H8.061a.75.75 0 0 0-.53.22L5 14.311V11.75a.75.75 0 0 0-.75-.75H1.75a.25.25 0 0 1-.25-.25v-8.5a.25.25 0 0 1 .25-.25ZM14.25 1H1.75A1.75 1.75 0 0 0 0 2.75v8.5C0 12.216.784 13 1.75 13H3.5v3.25a.75.75 0 0 0 1.28.53L8.81 13h5.44A1.75 1.75 0 0 0 16 11.25v-8.5A1.75 1.75 0 0 0 14.25 1Z"/></svg>Quote reply</button></span>
+      <div class="dropdown-divider"></div>
+      <span><button type="button" class="dropdown-item" role="menuitem"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11.013 1.427a1.75 1.75 0 0 1 2.474 0l1.086 1.086a1.75 1.75 0 0 1 0 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a1.125 1.125 0 0 1-1.392-1.392l.93-3.25c.081-.286.235-.547.445-.758l8.61-8.61Zm.176 4.823L9.75 4.81l-6.286 6.287a.253.253 0 0 0-.064.108l-.558 1.953 1.953-.558a.253.253 0 0 0 .108-.064Zm1.238-3.763a.25.25 0 0 0-.354 0L10.811 3.75l1.439 1.44 1.263-1.263a.25.25 0 0 0 0-.354Z"/></svg>Edit</button></span>
+      <span><button type="button" class="dropdown-item danger" role="menuitem"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11 1.75V3h2.25a.75.75 0 0 1 0 1.5H2.75a.75.75 0 0 1 0-1.5H5V1.75C5 .784 5.784 0 6.75 0h2.5C10.216 0 11 .784 11 1.75ZM4.496 6.675l.66 6.6a.25.25 0 0 0 .249.225h5.19a.25.25 0 0 0 .249-.225l.66-6.6a.75.75 0 0 1 1.492.149l-.66 6.6A1.75 1.75 0 0 1 10.595 15h-5.19a1.75 1.75 0 0 1-1.741-1.575l-.66-6.6a.75.75 0 1 1 1.492-.15ZM6.5 1.75V3h3V1.75a.25.25 0 0 0-.25-.25h-2.5a.25.25 0 0 0-.25.25Z"/></svg>Delete</button></span>
+    </details-menu>
+  </details>
+</template>
+
 <script>
+  // Fill every menu slot from the template before content.js runs.
+  const tpl = document.getElementById('menu-template');
+  for (const slot of document.querySelectorAll('.tldr-menu-slot')) {
+    const menu = tpl.content.firstElementChild.cloneNode(true);
+    if (slot.dataset.open === '1') {
+      menu.open = true;
+      menu.querySelector('summary').hidden = true;
+      menu.querySelector('.dropdown-menu').classList.add('open-menu');
+    }
+    slot.appendChild(menu);
+  }
+
   // Minimal stand-in for the extension APIs content.js expects. The real cache
   // lives in the service worker; here it is a Map, keyed the same way — by the
   // comment text — so the behaviour on screen matches the shipping one.
@@ -530,7 +369,7 @@
     },
   };
 
-  // Empties the stub cache and closes every panel, so the buttons go back to
+  // Empties the stub cache and closes every panel, so the entries go back to
   // needing a click — the state a first-time visitor to a thread sees.
   document.getElementById('clear').addEventListener('click', () => {
     cache.clear();
@@ -539,6 +378,12 @@
       panel.dataset.loaded = '0';
       panel.textContent = '';
     }
+  });
+
+  document.getElementById('pause-demo').addEventListener('click', (e) => {
+    const demo = document.getElementById('fill-demo');
+    const paused = demo.classList.toggle('is-paused');
+    e.target.textContent = paused ? 'Resume' : 'Pause';
   });
 
   document.getElementById('theme').addEventListener('click', () => {

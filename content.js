@@ -39,9 +39,21 @@ const WAND_PATHS = [
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
+// The resting icon is stroked with a gradient, which needs a paint server in
+// the document. One hidden <svg> serves every entry on the page; content.css
+// supplies the stop colours (and the hover state swaps back to currentColor).
+const GRADIENT_ID = 'gh-tldr-icon-gradient';
+
 const PROCESSED = 'data-tldr-ready';
+// The cloned wrapper, used for dedupe; and the element GitHub actually hovers
+// and fills, which is what content.css styles.
+const ENTRY_CLASS = 'gh-tldr-entry';
 const MENU_ITEM_CLASS = 'gh-tldr-menu-item';
-const MIN_CHARS = 120; // shorter comments don't need a TLDR
+// Only long comments are worth an up-front cache lookup. The menu entry itself
+// is offered whatever the length: it takes no space until the menu is opened,
+// and an entry that silently goes missing on short comments just reads as a
+// broken extension. This mattered less when it was a button in the header.
+const PEEK_MIN_CHARS = 120;
 
 // innerText gives the rendered text (collapsed details, hidden nodes dropped);
 // textContent is the fallback where innerText isn't implemented.
@@ -93,7 +105,55 @@ function commentContainerOf(body) {
   return ownContainerOf(body) || body.parentElement;
 }
 
+function ensureGradient() {
+  if (document.getElementById(GRADIENT_ID)) return;
+
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('width', '0');
+  svg.setAttribute('height', '0');
+  svg.style.position = 'absolute';
+  svg.style.pointerEvents = 'none';
+
+  const defs = document.createElementNS(SVG_NS, 'defs');
+  const gradient = document.createElementNS(SVG_NS, 'linearGradient');
+  gradient.setAttribute('id', GRADIENT_ID);
+  // The icon's own 24-unit viewBox, on the diagonal the wand is drawn along.
+  gradient.setAttribute('gradientUnits', 'userSpaceOnUse');
+  gradient.setAttribute('x1', '2');
+  gradient.setAttribute('y1', '22');
+  gradient.setAttribute('x2', '22');
+  gradient.setAttribute('y2', '2');
+
+  ['0%', '38%', '70%', '100%'].forEach((offset, i) => {
+    const stop = document.createElementNS(SVG_NS, 'stop');
+    stop.setAttribute('offset', offset);
+    stop.setAttribute('class', `gh-tldr-stop-${i + 1}`);
+    gradient.appendChild(stop);
+  });
+
+  defs.appendChild(gradient);
+  svg.appendChild(defs);
+  document.body.appendChild(svg);
+}
+
+// The hover fill is a mesh gradient: seven blurred colour blobs behind the
+// label, animated independently. They need real elements, so they are built
+// here; content.css owns their colours and paths.
+function buildMesh() {
+  const mesh = document.createElement('span');
+  mesh.className = 'gh-tldr-mesh';
+  mesh.setAttribute('aria-hidden', 'true');
+  for (let i = 0; i < 7; i += 1) {
+    const blob = document.createElement('span');
+    blob.className = 'gh-tldr-blob';
+    mesh.appendChild(blob);
+  }
+  return mesh;
+}
+
 function wandIcon() {
+  ensureGradient();
   const svg = document.createElementNS(SVG_NS, 'svg');
   svg.setAttribute('viewBox', '0 0 24 24');
   svg.setAttribute('fill', 'none');
@@ -116,19 +176,36 @@ function isQuoteReply(el) {
   return QUOTE_LABEL.test(textOf(el));
 }
 
-// Replace the visible label, leaving the element structure alone.
-function setLabel(root, text) {
+// Swap the visible label for our own, wrapped in .gh-tldr-label so the design
+// has something to paint the gradient onto. Where GitHub already wraps its
+// label in an element of its own, that wrapper is reused so its spacing
+// survives; otherwise the bare text node is replaced.
+function wrapLabel(root, text) {
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   const nodes = [];
   while (walker.nextNode()) {
     if (walker.currentNode.nodeValue.trim()) nodes.push(walker.currentNode);
   }
+
+  const label = document.createElement('span');
+  label.className = 'gh-tldr-label';
+  label.textContent = text;
+
   if (!nodes.length) {
-    root.appendChild(document.createTextNode(text));
-    return;
+    root.appendChild(label);
+    return label;
   }
-  nodes[0].nodeValue = text;
+
+  const first = nodes[0];
+  const holder = first.parentElement;
+  if (holder !== root && holder.childNodes.length === 1) {
+    holder.textContent = '';
+    holder.appendChild(label);
+  } else {
+    first.replaceWith(label);
+  }
   for (const extra of nodes.slice(1)) extra.nodeValue = '';
+  return label;
 }
 
 // The only way to look exactly like a GitHub menu item is to be one: clone the
@@ -136,10 +213,10 @@ function setLabel(root, text) {
 // data-* attributes, the lot -- then swap the label and the glyph. Building a
 // <button> and copying a class name is what made it read as a button.
 function makeMenuItem(cell) {
-  const item = cell.cloneNode(true);
-  item.classList.add(MENU_ITEM_CLASS);
+  const entry = cell.cloneNode(true);
+  entry.classList.add(ENTRY_CLASS);
 
-  const all = [item, ...item.querySelectorAll('*')];
+  const all = [entry, ...entry.querySelectorAll('*')];
   for (const el of all) {
     // Ids must stay unique, and anything pointing at the original's id is now
     // dangling.
@@ -156,6 +233,12 @@ function makeMenuItem(cell) {
     }
     el.removeAttribute('disabled');
   }
+
+  // content.css styles the element GitHub itself hovers and fills — the
+  // actionable one — not the layout wrapper around it.
+  const selector = MENU_ITEM_SELECTORS.join(',');
+  const item = entry.matches(selector) ? entry : entry.querySelector(selector) || entry;
+  item.classList.add(MENU_ITEM_CLASS);
 
   // Swap the glyph in place, keeping whatever wrapper and sizing GitHub gave it.
   const icon = item.querySelector('svg');
@@ -176,8 +259,12 @@ function makeMenuItem(cell) {
     icon.replaceWith(wand);
   }
 
-  setLabel(item, 'TLDR');
-  return item;
+  wrapLabel(item, 'TLDR');
+
+  // Behind the label and icon, which content.css lifts above it with z-index.
+  item.insertBefore(buildMesh(), item.firstChild);
+
+  return entry;
 }
 
 // The entry may be wrapped in a layout span; insert after the outermost
@@ -275,15 +362,24 @@ async function summarize(panel, body) {
 // can find the one it belongs to.
 const panels = new WeakMap();
 
-function attach(body) {
-  if (body.hasAttribute(PROCESSED)) return;
-  body.setAttribute(PROCESSED, '1');
-
-  if (textOf(body).length < MIN_CHARS) return;
+// One panel per comment, created on first need and reused after that.
+function panelFor(body) {
+  const existing = panels.get(body);
+  if (existing) return existing;
 
   const panel = makePanel();
   body.parentElement.insertBefore(panel, body);
   panels.set(body, panel);
+  return panel;
+}
+
+function attach(body) {
+  if (body.hasAttribute(PROCESSED)) return;
+  body.setAttribute(PROCESSED, '1');
+
+  if (textOf(body).length < PEEK_MIN_CHARS) return;
+
+  const panel = panelFor(body);
 
   // If this exact comment text was summarized before, show it straight away.
   // A miss (including an edited comment, whose text now hashes differently)
@@ -326,20 +422,21 @@ function commentForMenu(item) {
 function addMenuEntry(quote) {
   const cell = outerCell(quote);
   const next = cell.nextElementSibling;
-  if (next && next.classList.contains(MENU_ITEM_CLASS)) return; // already there
+  if (next && next.classList.contains(ENTRY_CLASS)) return; // already there
 
   const body = commentForMenu(quote);
   if (!body) return;
 
-  attach(body); // a lazily rendered comment may not have been scanned yet
-  const panel = panels.get(body);
-  if (!panel) return;
+  attach(body); // a lazily rendered comment may not have been peeked yet
 
   const item = makeMenuItem(cell);
   item.addEventListener('click', (e) => {
     e.preventDefault();
     e.stopPropagation();
     closeMenu(item);
+    // Built here rather than up front, so a comment nobody summarizes costs
+    // no DOM at all.
+    const panel = panelFor(body);
     if (panel.dataset.loaded === '1') {
       panel.hidden = !panel.hidden;
       return;
@@ -355,7 +452,7 @@ function addMenuEntry(quote) {
 function scanMenus() {
   for (const sel of MENU_ITEM_SELECTORS) {
     for (const candidate of document.querySelectorAll(sel)) {
-      if (candidate.closest('.' + MENU_ITEM_CLASS)) continue;
+      if (candidate.closest('.' + ENTRY_CLASS)) continue;
       if (isQuoteReply(candidate)) addMenuEntry(candidate);
     }
   }
