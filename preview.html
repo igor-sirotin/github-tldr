@@ -133,9 +133,12 @@
      is the padded, rounded box that takes the hover. */
   .ActionList { list-style: none; margin: 0; padding: 8px; display: grid; gap: 2px; }
   .ActionList-item { margin: 0; }
+  /* Grid with a border, as GitHub's really is — the two properties that make a
+     child-painted fill and an element-painted fill different rectangles. Any
+     mismatch shows up here rather than only on the live site. */
   .ActionList-content {
-    display: flex; align-items: center; gap: 8px; width: 100%;
-    padding: 6px 8px; border: 0; border-radius: 6px; background: none;
+    display: grid; grid-template-columns: 16px 1fr; align-items: center; gap: 8px; width: 100%;
+    padding: 6px 8px; border: 1px solid transparent; border-radius: 6px; background: none;
     font: 400 14px/20px inherit; color: var(--fgColor-default); text-align: left;
     cursor: pointer; white-space: nowrap;
   }

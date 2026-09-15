@@ -207,8 +207,9 @@
   pointer-events: none;
   opacity: 0;
   transition: opacity 140ms cubic-bezier(.2, .8, .2, 1);
-  /* Flat base under the blobs. `background-color`, not `background`, so it is
-     not mistakable for a blob's own gradient rule. */
+  /* Flat base under the blobs, and the only fill the entry paints — see the
+     hover rule below. `background-color`, not `background`, so it is not
+     mistakable for a blob's own gradient rule. */
   background-color: var(--tldr-base);
 }
 
@@ -325,8 +326,16 @@
 .gh-tldr-menu-item:focus,
 .gh-tldr-menu-item:focus-visible,
 .gh-tldr-menu-item[aria-selected="true"] {
+  /* Suppress the host's own hover fill, but do not repaint one here. Exactly
+     one element may paint this fill, and it has to be the mesh: an element's
+     background covers its BORDER box, while an absolutely positioned child
+     covers its parent's PADDING box, so an item-level fill and the mesh are
+     two different rectangles whenever the host puts a border on the item —
+     and a larger mismatch again if anything moves the mesh's containing block.
+     The mesh carries --tldr-base itself, so nothing is lost by leaving the
+     item transparent. */
   background-color: transparent !important;
-  background-image: linear-gradient(var(--tldr-base), var(--tldr-base)) !important;
+  background-image: none !important;
   outline: none;
 }
 

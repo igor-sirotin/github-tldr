@@ -102,6 +102,20 @@ vm.runInContext(fs.readFileSync(SRC, 'utf8'), ctx);
 
 const doc = dom.window.document;
 const assert = (c, m) => { if (!c) { console.error('FAIL:', m); process.exitCode = 1; } else console.log('ok -', m); };
+
+// --- stylesheet invariant ---
+// An element's background covers its BORDER box; an absolutely positioned child
+// covers its parent's PADDING box. So if both the item and the mesh paint the
+// base colour, they are two rectangles of different sizes and the seam shows.
+// Exactly one rule may paint it, and it must be the mesh.
+const css = fs.readFileSync(path.join(__dirname, '..', 'content.css'), 'utf8');
+const fills = css
+  .split('}')
+  .filter((block) => /background[^:]*:[^;]*--tldr-base/.test(block))
+  .map((block) => block.split('{')[0].trim().split('\n').pop().trim());
+assert(fills.length === 1, `exactly one rule paints the base fill (got ${fills.length}: ${fills.join(' / ')})`);
+assert(fills[0] === '.gh-tldr-mesh', `and it is the mesh (got ${fills[0]})`);
+assert(/background-image: none !important/.test(css), "the item suppresses the host's fill without repainting one");
 const entryIn = (root) => root.querySelector('.gh-tldr-entry');
 const actionable = (entry) => entry.querySelector('.gh-tldr-menu-item') || entry;
 const labelsIn = (menu) => [...menu.querySelectorAll('[role="menuitem"]')].map((el) => el.textContent.trim());
