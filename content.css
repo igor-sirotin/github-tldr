@@ -195,7 +195,12 @@
 .gh-tldr-mesh {
   position: absolute;
   inset: 0;
-  grid-area: 1 / 1;
+  /* No `grid-area`. ActionList's content element is a grid, and giving an
+     absolutely positioned child a definite grid position makes its containing
+     block that grid AREA — which sits inside the element's padding. The mesh
+     then paints a smaller rectangle inset from the hover fill behind it, and
+     you see two boxes. With no grid position the containing block is the
+     padding box, so the mesh covers the fill exactly. */
   z-index: 0;
   overflow: hidden;
   border-radius: inherit;

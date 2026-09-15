@@ -442,6 +442,12 @@ function attach(body) {
 // climbing finds it; Primer portals its menus to the end of the document, so
 // there we climb from whatever was clicked to open it instead.
 let lastAnchor = null;
+// ...and GitHub re-renders the menu after opening it, which can replace the
+// trigger too. Remember the comment whose menu was last opened, so a re-render
+// does not orphan the entry. It is only consulted after both the menu and the
+// trigger have failed to resolve, and any live trigger wins over it, so
+// another comment's menu cannot inherit a stale value.
+let lastBody = null;
 
 function ownCommentOf(el) {
   let node = el.parentElement;
@@ -455,10 +461,12 @@ function ownCommentOf(el) {
 }
 
 function commentForMenu(item) {
-  return (
+  const found =
     ownCommentOf(item) ||
-    (lastAnchor && lastAnchor.isConnected ? ownCommentOf(lastAnchor) : null)
-  );
+    (lastAnchor && lastAnchor.isConnected ? ownCommentOf(lastAnchor) : null) ||
+    (lastBody && lastBody.isConnected ? lastBody : null);
+  if (found) lastBody = found;
+  return found;
 }
 
 function addMenuEntry(quote) {
@@ -508,7 +516,19 @@ function scan() {
 }
 
 let pending = null;
+let menuFrame = null;
 const observer = new MutationObserver(() => {
+  // GitHub fills these menus in after opening them and re-renders them
+  // wholesale, which throws our entry away. Waiting for the debounce below
+  // means the entry visibly flicks out and back, so menus are re-checked on
+  // the very next frame; it is only a querySelectorAll over menu items.
+  if (menuFrame === null) {
+    menuFrame = requestAnimationFrame(() => {
+      menuFrame = null;
+      scanMenus();
+    });
+  }
+
   if (pending) return;
   pending = setTimeout(() => {
     pending = null;
@@ -525,7 +545,14 @@ document.addEventListener(
     const el = e.target instanceof Element ? e.target : null;
     if (!el) return;
     lastAnchor = el.closest('summary, button, [role="button"]') || el;
-    for (const delay of [0, 60, 200]) setTimeout(scanMenus, delay);
+    // Bind the memory to whatever was just clicked, while it is still in the
+    // document. Clearing it instead would throw away the only reference left
+    // once a re-render replaces the trigger.
+    const clickedIn = ownCommentOf(lastAnchor);
+    if (clickedIn) lastBody = clickedIn;
+    // Menu contents can arrive well after the click, so keep looking for a
+    // while rather than only on the next few frames.
+    for (const delay of [0, 60, 200, 500, 1000]) setTimeout(scanMenus, delay);
   },
   true
 );

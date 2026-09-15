@@ -132,11 +132,17 @@ Finding the right spot without knowing GitHub's class names:
 - **Insert beside, not inside.** Classic items sit in a wrapper `<span>`, so the
   entry is placed after the outermost wrapper that is still inside the menu.
 
-Menus are re-rendered every time they open, and Primer portals its menu to the
-end of the document rather than leaving it inside the comment. So the entry is
-re-added on mutations and on the frames right after any click, and the owning
-comment is resolved from the menu itself where it is inline, or from whichever
-trigger was last clicked where it is not.
+Menus are filled in *after* they open and are then re-rendered wholesale, which
+throws the entry away — it flicks in and vanishes. So menus are re-checked on
+the very next animation frame after any mutation, not just on the 300ms
+debounce, and for a second after any click, since menu contents can arrive late.
+
+Primer also portals its menu to the end of the document rather than leaving it
+inside the comment, so the owning comment is resolved from the menu where it is
+inline and from the trigger where it is not. A re-render can replace that
+trigger too, so the comment whose menu was last opened is remembered; any live
+trigger still wins over that memory, so another comment's menu cannot inherit a
+stale one.
 
 ## Which comment
 

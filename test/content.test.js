@@ -268,6 +268,36 @@ assert(sent.filter((m) => m.type === 'peek').length === 5,
   assert(last.text.includes('The issue description'), 'portalled entry summarizes the comment whose kebab was clicked');
   assert(doc.querySelector('[data-testid="issue-body-viewer"] .gh-tldr-panel').hidden === false, 'issue panel opens');
 
+  // --- the entry must survive GitHub re-rendering the menu ---
+  // Menu contents arrive after the click and are then replaced wholesale, which
+  // threw the entry away: it flicked in and vanished. The trigger is replaced
+  // too, so the comment can no longer be resolved from it.
+  const rerenderMenu = portal.querySelector('#portal-menu');
+  const freshMarkup = `${actionListItem('Copy link')}${actionListItem('Quote reply', 'js-comment-quote-reply')}`;
+  rerenderMenu.innerHTML = freshMarkup; // React swaps the whole list
+  const oldKebab = doc.getElementById('issue-kebab');
+  const newKebab = oldKebab.cloneNode(true);
+  oldKebab.replaceWith(newKebab); // ...and the trigger with it
+  assert(!portal.querySelector('.gh-tldr-entry'), 'precondition: the re-render removed the entry');
+
+  await new Promise((r) => setTimeout(r, 400));
+  const readded = portal.querySelector('.gh-tldr-entry');
+  assert(readded, 'the entry is put back after the menu re-renders');
+  assert(readded.querySelector('.gh-tldr-menu-item').dataset.tldrMenu === 'actionlist',
+    'and is still shaped for the menu it rejoined');
+
+  // It is wired to the same comment's panel, which this test already
+  // summarized — so it toggles rather than paying for a second summary.
+  const issuePanel = doc.querySelector('[data-testid="issue-body-viewer"] .gh-tldr-panel');
+  const beforeRerenderClick = sent.filter((m) => m.type === 'tldr').length;
+  assert(issuePanel.hidden === false, 'precondition: that comment is already summarized and open');
+  actionable(readded).dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 30));
+  assert(issuePanel.hidden === true,
+    'the re-added entry still drives its own panel, though the trigger it was resolved from is gone');
+  assert(sent.filter((m) => m.type === 'tldr').length === beforeRerenderClick,
+    'and does not re-request a summary it already has');
+
   // --- errors and cached summaries still work ---
   tldrReply = { error: 'No OpenAI API key set.' };
   const menuB = doc.querySelector('#b-details details-menu');
