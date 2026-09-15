@@ -7,16 +7,26 @@ const SRC = path.join(__dirname, '..', 'content.js');
 const long = 'This is a long GitHub comment that definitely deserves a summary. '.repeat(4);
 
 // A classic comment carries its ... menu inline, inside the comment itself.
+// Items are wrapped in a layout span and carry an octicon, the way GitHub
+// builds them — the entry has to reproduce that, not just the class name.
+const menuItem = (label, extraClass = '', icon = 'octicon-link') => `
+      <span data-view-component="true">
+        <button class="dropdown-item btn-link ${extraClass}" role="menuitem" data-view-component="true">
+          <svg class="octicon ${icon}" width="16" height="16" aria-hidden="true" data-component="Octicon"><path d="M0 0"/></svg>
+          ${label}
+        </button>
+      </span>`;
+
 const classicMenu = (id) => `
   <details class="details-overlay" id="${id}-details">
     <summary class="timeline-comment-action" id="${id}-kebab">…</summary>
     <details-menu class="dropdown-menu">
-      <span data-view-component="true"><button class="dropdown-item btn-link" role="menuitem">Copy link</button></span>
-      <span data-view-component="true"><button class="dropdown-item btn-link" role="menuitem">Copy Markdown</button></span>
-      <span data-view-component="true"><button class="dropdown-item btn-link js-comment-quote-reply" role="menuitem">Quote reply</button></span>
+      ${menuItem('Copy link')}
+      ${menuItem('Copy Markdown')}
+      ${menuItem('Quote reply', 'js-comment-quote-reply', 'octicon-quote')}
       <div class="dropdown-divider" role="none"></div>
-      <span data-view-component="true"><button class="dropdown-item btn-link" role="menuitem">Edit</button></span>
-      <span data-view-component="true"><button class="dropdown-item btn-link" role="menuitem">Delete</button></span>
+      ${menuItem('Edit', '', 'octicon-pencil')}
+      ${menuItem('Delete', '', 'octicon-trash')}
     </details-menu>
   </details>`;
 
@@ -79,6 +89,7 @@ vm.runInContext(fs.readFileSync(SRC, 'utf8'), ctx);
 const doc = dom.window.document;
 const assert = (c, m) => { if (!c) { console.error('FAIL:', m); process.exitCode = 1; } else console.log('ok -', m); };
 const entryIn = (root) => root.querySelector('.gh-tldr-menu-item');
+const actionable = (entry) => entry.querySelector('[role="menuitem"]') || entry;
 const labelsIn = (menu) => [...menu.querySelectorAll('[role="menuitem"]')].map((el) => el.textContent.trim());
 
 // --- the menu entry, classic inline menus ---
@@ -94,9 +105,29 @@ assert(entryIn(menuA).previousElementSibling === quoteCell, 'nothing was inserte
 const divider = menuA.querySelector('.dropdown-divider');
 assert(entryIn(menuA).compareDocumentPosition(divider) & 4, 'entry stays in the first section, above the divider');
 
-assert(entryIn(menuA).className.includes('dropdown-item'), "entry borrows the neighbouring item's classes");
-assert(entryIn(menuA).getAttribute('role') === 'menuitem', 'entry is exposed as a menu item');
-assert(!entryIn(menuA).querySelector('svg'), 'no icon, because the classic menu items have none');
+// It must *be* a GitHub menu item, not a button wearing its class name.
+const quoteCellA = menuA.querySelector('.js-comment-quote-reply').parentElement;
+const entryA = entryIn(menuA);
+assert(entryA.tagName === quoteCellA.tagName, `entry has the same wrapper element as a real item (${entryA.tagName} vs ${quoteCellA.tagName})`);
+assert(actionable(entryA).tagName === 'BUTTON' && actionable(entryA).className.includes('dropdown-item btn-link'),
+  'the actionable element keeps the real item classes, including the button reset');
+assert(actionable(entryA).getAttribute('data-view-component') === 'true', "Primer's styling attributes survive the clone");
+assert(actionable(entryA).getAttribute('role') === 'menuitem', 'entry is exposed as a menu item');
+assert(entryA.textContent.trim() === 'TLDR', `label reads TLDR and nothing else (got ${JSON.stringify(entryA.textContent.trim())})`);
+assert(!entryA.textContent.includes('Quote'), 'the cloned label is gone');
+
+// Icon: same slot, same sizing, wand glyph.
+const wand = entryA.querySelector('svg');
+assert(wand && wand.classList.contains('gh-tldr-wand'), 'entry carries the wand glyph');
+assert(wand.classList.contains('octicon'), "it keeps GitHub's octicon class so it is sized and spaced natively");
+assert(!wand.classList.contains('octicon-quote'), "but not the original glyph's specific class");
+assert(wand.getAttribute('width') === '16' && wand.getAttribute('height') === '16', 'icon keeps the real item dimensions');
+assert(wand.querySelectorAll('path').length === 8, 'and is the full lucide wand, not the cloned path');
+
+// Nothing that belonged to Quote reply may come along.
+assert(!entryA.querySelector('.js-comment-quote-reply') && !entryA.classList.contains('js-comment-quote-reply'),
+  'no js- behaviour hooks are cloned');
+assert(!entryA.querySelector('[id]') && !entryA.hasAttribute('id'), 'no duplicated ids');
 assert(doc.querySelectorAll('.gh-tldr-btn').length === 0, 'no injected button remains anywhere');
 
 // One entry per comment, including inside a review thread.
@@ -118,7 +149,7 @@ assert(!doc.querySelector('#comment-short .gh-tldr-menu-item'), 'short comment g
   const panelA = doc.querySelector('#comment-a .gh-tldr-panel');
   assert(panelA && panelA.hidden === true, 'a hidden panel is prepared for each comment');
 
-  entryIn(menuA).dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+  actionable(entryIn(menuA)).dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
   await new Promise((r) => setTimeout(r, 30));
 
   const tldrs = sent.filter((m) => m.type === 'tldr');
@@ -128,7 +159,7 @@ assert(!doc.querySelector('#comment-short .gh-tldr-menu-item'), 'short comment g
   assert(doc.getElementById('a-details').open === false, 'the menu closes after choosing TLDR');
 
   // Choosing it again toggles, without paying for a second summary.
-  entryIn(menuA).dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+  actionable(entryIn(menuA)).dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
   await new Promise((r) => setTimeout(r, 20));
   assert(panelA.hidden === true && sent.filter((m) => m.type === 'tldr').length === 1, 'choosing it again hides the panel, no second request');
 
@@ -157,7 +188,7 @@ assert(!doc.querySelector('#comment-short .gh-tldr-menu-item'), 'short comment g
   // --- errors and cached summaries still work ---
   tldrReply = { error: 'No OpenAI API key set.' };
   const menuB = doc.querySelector('#b-details details-menu');
-  entryIn(menuB).dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+  actionable(entryIn(menuB)).dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
   await new Promise((r) => setTimeout(r, 30));
   const panelB = doc.querySelector('#comment-b .gh-tldr-panel');
   assert(panelB.className.includes('gh-tldr-error') && panelB.textContent.includes('No OpenAI API key'), 'errors surface in the panel');

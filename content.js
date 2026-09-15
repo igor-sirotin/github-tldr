@@ -116,22 +116,67 @@ function isQuoteReply(el) {
   return QUOTE_LABEL.test(textOf(el));
 }
 
-// Borrow the neighbouring entry's classes so the new one inherits whatever
-// GitHub styles menu items with today, in either menu implementation.
-function makeMenuItem(reference) {
-  const item = document.createElement('button');
-  item.type = 'button';
-  item.className = `${reference.className} ${MENU_ITEM_CLASS}`.trim();
-  item.setAttribute('role', reference.getAttribute('role') || 'menuitem');
-  item.title = 'Summarize this comment with AI';
+// Replace the visible label, leaving the element structure alone.
+function setLabel(root, text) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  while (walker.nextNode()) {
+    if (walker.currentNode.nodeValue.trim()) nodes.push(walker.currentNode);
+  }
+  if (!nodes.length) {
+    root.appendChild(document.createTextNode(text));
+    return;
+  }
+  nodes[0].nodeValue = text;
+  for (const extra of nodes.slice(1)) extra.nodeValue = '';
+}
 
-  // Only carry an icon if the menu it is joining uses them.
-  if (reference.querySelector('svg')) item.appendChild(wandIcon());
+// The only way to look exactly like a GitHub menu item is to be one: clone the
+// neighbouring entry whole -- wrapper element, nested icon slot, Primer's
+// data-* attributes, the lot -- then swap the label and the glyph. Building a
+// <button> and copying a class name is what made it read as a button.
+function makeMenuItem(cell) {
+  const item = cell.cloneNode(true);
+  item.classList.add(MENU_ITEM_CLASS);
 
-  const label = document.createElement('span');
-  label.className = 'gh-tldr-label';
-  label.textContent = 'TLDR';
-  item.appendChild(label);
+  const all = [item, ...item.querySelectorAll('*')];
+  for (const el of all) {
+    // Ids must stay unique, and anything pointing at the original's id is now
+    // dangling.
+    el.removeAttribute('id');
+    el.removeAttribute('aria-labelledby');
+    el.removeAttribute('aria-describedby');
+    // Behavioural hooks belong to Quote reply, not to us.
+    el.removeAttribute('data-testid');
+    el.removeAttribute('value');
+    el.removeAttribute('for');
+    if (el.tagName === 'A') el.removeAttribute('href');
+    for (const cls of [...el.classList]) {
+      if (cls.startsWith('js-')) el.classList.remove(cls);
+    }
+    el.removeAttribute('disabled');
+  }
+
+  // Swap the glyph in place, keeping whatever wrapper and sizing GitHub gave it.
+  const icon = item.querySelector('svg');
+  if (icon) {
+    const wand = wandIcon();
+    for (const cls of icon.classList) {
+      if (!cls.startsWith('octicon-')) wand.classList.add(cls);
+    }
+    for (const attr of ['width', 'height', 'aria-hidden', 'focusable', 'data-component']) {
+      if (icon.hasAttribute(attr)) wand.setAttribute(attr, icon.getAttribute(attr));
+    }
+    // If GitHub sized the glyph by neither attribute nor class, the SVG would
+    // have no intrinsic size at all.
+    if (!wand.hasAttribute('width') && !wand.classList.length) {
+      wand.setAttribute('width', '16');
+      wand.setAttribute('height', '16');
+    }
+    icon.replaceWith(wand);
+  }
+
+  setLabel(item, 'TLDR');
   return item;
 }
 
@@ -290,7 +335,7 @@ function addMenuEntry(quote) {
   const panel = panels.get(body);
   if (!panel) return;
 
-  const item = makeMenuItem(quote);
+  const item = makeMenuItem(cell);
   item.addEventListener('click', (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -310,7 +355,7 @@ function addMenuEntry(quote) {
 function scanMenus() {
   for (const sel of MENU_ITEM_SELECTORS) {
     for (const candidate of document.querySelectorAll(sel)) {
-      if (candidate.classList.contains(MENU_ITEM_CLASS)) continue;
+      if (candidate.closest('.' + MENU_ITEM_CLASS)) continue;
       if (isQuoteReply(candidate)) addMenuEntry(candidate);
     }
   }

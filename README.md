@@ -94,11 +94,18 @@ Finding the right spot without knowing GitHub's class names:
   and the visible label is the fallback, so the entry lands immediately under it
   and therefore at the end of the menu's first section, above the divider. The
   label fallback is the one part a non-English UI would miss.
-- **Borrow the neighbour's classes.** The new entry copies the Quote reply
-  item's `className` and `role`, so GitHub styles it natively in both the
-  classic `details-menu` and Primer's `ActionList` without the extension
-  shipping a single menu-item colour. It only carries the wand icon if the menu
-  it joins already uses icons.
+- **Clone the neighbour, don't imitate it.** The entry is a deep clone of the
+  Quote reply item's whole cell — wrapper element, nested icon slot, Primer's
+  `data-*` attributes and all — with the label swapped to `TLDR` and the glyph
+  swapped for the wand. Building a `<button>` and copying a class name is not
+  enough: any wrapper or attribute GitHub styles on is lost and native button
+  chrome shows through. Cloning means the extension ships **no** menu styling at
+  all, so the entry cannot drift from its neighbours.
+- **Strip what belonged to Quote reply.** Ids (which must stay unique), `js-`
+  behaviour hooks, `data-testid`, `href`/`value`/`for` and dangling
+  `aria-labelledby` are all removed from the clone. The wand keeps the original
+  glyph's `octicon` class and width/height so it is sized and spaced natively,
+  but not its specific `octicon-quote` class.
 - **Insert beside, not inside.** Classic items sit in a wrapper `<span>`, so the
   entry is placed after the outermost wrapper that is still inside the menu.
 

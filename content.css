@@ -1,15 +1,8 @@
 /* GitHub TLDR — button + summary panel */
 
-/* The entry clones the neighbouring menu item's classes, so GitHub styles it.
-   Only the icon needs anything from us, and it is kept inline so a menu whose
-   items are plain blocks is not forced into flex layout. */
-.gh-tldr-menu-item .gh-tldr-wand {
-  width: 16px;
-  height: 16px;
-  flex: none;
-  vertical-align: text-bottom;
-  margin-right: 8px;
-}
+/* Nothing here styles the menu entry: it is a clone of a real GitHub menu item,
+   so GitHub's own rules apply to it. Adding anything would be the thing that
+   made it look out of place. */
 
 /* Panel */
 

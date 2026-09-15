@@ -23,6 +23,9 @@ JSDOM.fromURL(file, { runScripts: 'dangerously', resources: 'usable', pretendToB
       assert(labels[labels.indexOf('Quote reply') + 1] === 'TLDR', `TLDR follows Quote reply (${labels.join(' | ')})`);
       const entry = menu.querySelector('.gh-tldr-menu-item');
       assert(entry.compareDocumentPosition(menu.querySelector('.dropdown-divider')) & 4, 'entry is in the first section');
+      const sibling = menu.querySelector('.js-comment-quote-reply').parentElement;
+      assert(entry.tagName === sibling.tagName, 'entry matches the wrapper element of a real item');
+      assert(entry.querySelector('svg.gh-tldr-wand.octicon'), 'entry carries the wand in the native icon slot');
     }
 
     // Each thread reply keeps its own entry and its own panel.
@@ -42,7 +45,7 @@ JSDOM.fromURL(file, { runScripts: 'dangerously', resources: 'usable', pretendToB
     const first = doc.querySelector('details-menu');
     const panel = first.closest('.timeline-comment').querySelector('.gh-tldr-panel');
     assert(panel.hidden === true, 'uncached comment starts closed');
-    click(first.querySelector('.gh-tldr-menu-item'));
+    click(first.querySelector('.gh-tldr-menu-item [role="menuitem"]'));
     assert(first.closest('details').open === false, 'menu closes on choosing TLDR');
     await new Promise((r) => setTimeout(r, 1100));
     assert(panel.hidden === false, 'stubbed summary renders');
@@ -51,7 +54,7 @@ JSDOM.fromURL(file, { runScripts: 'dangerously', resources: 'usable', pretendToB
 
     // The stub fails every second call, so the next one shows the error state.
     const second = doc.querySelectorAll('details-menu')[1];
-    click(second.querySelector('.gh-tldr-menu-item'));
+    click(second.querySelector('.gh-tldr-menu-item [role="menuitem"]'));
     await new Promise((r) => setTimeout(r, 1100));
     assert(second.closest('.timeline-comment').querySelector('.gh-tldr-panel').className.includes('gh-tldr-error'),
       'second choice reaches the error state');
