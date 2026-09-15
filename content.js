@@ -357,7 +357,8 @@ function fitMesh(item, mesh) {
   const inset = ['top', 'right', 'bottom', 'left']
     .map((side) => `-${borderWidth(cs, side)}px`)
     .join(' ');
-  mesh.style.inset = inset;
+  // Set with priority, so a host rule cannot move the overlay either.
+  mesh.style.setProperty('inset', inset, 'important');
 }
 
 function closeMenu(el) {

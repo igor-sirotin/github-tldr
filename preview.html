@@ -137,11 +137,15 @@
      child-painted fill and an element-painted fill different rectangles. Any
      mismatch shows up here rather than only on the live site. */
   .ActionList-content {
-    display: grid; grid-template-columns: 16px 1fr; align-items: center; gap: 8px; width: 100%;
+    display: grid; grid-template-columns: 16px 1fr; align-items: center; width: 100%;
     padding: 6px 8px; border: 1px solid transparent; border-radius: 6px; background: none;
     font: 400 14px/20px inherit; color: var(--fgColor-default); text-align: left;
     cursor: pointer; white-space: nowrap;
   }
+  /* GitHub spaces the children with a margin rule targeting every direct
+     child, not with `gap`. Reproduced verbatim in shape, because an absolutely
+     positioned overlay picks it up too and it shrinks the overlay's width. */
+  .ActionList-content > :not(:last-child, .ActionList-Spacer) { margin-right: var(--control-medium-gap, .5rem); }
   .ActionList-content:hover { background: var(--bgColor-neutral-muted); }
   .ActionList-item-visual { display: flex; align-items: center; }
   .ActionList-item-visual svg:not(.gh-tldr-wand) { width: 16px; height: 16px; fill: currentColor; }

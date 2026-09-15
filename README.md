@@ -117,6 +117,18 @@ Finding the right spot without knowing GitHub's class names:
   the label in an element of its own, that element is re-used rather than having
   another span nested inside it, and the icon's margin is dropped in ActionList,
   whose content element owns that gap.
+- **Opt the overlay out of the host's child spacing.** GitHub spaces an item's
+  children with rules aimed at every direct child, such as
+  `.ActionListContent > :not(:last-child, .Spacer) { margin-right: .5rem }`.
+  The mesh is a direct child too, and on an absolutely positioned box with both
+  `left` and `right` set a right margin *shrinks the used width* rather than
+  being ignored — which is a gap down the right of the fill that no amount of
+  adjusting `inset` can close, because the box is shrunk after the offsets
+  resolve. So the mesh neutralises margin, padding, border and grid/flex
+  placement with `!important`: the host's own children keep their spacing and
+  only the overlay opts out. The preview reproduces that rule, and a test
+  asserts the host's children still receive the margin while the mesh computes
+  to `0px`.
 - **Measure the box; don't assume it.** An element's background covers its
   *border* box. An absolutely positioned child can only reach its parent's
   *padding* box. So a mesh at `inset: 0` is always short by the item's border,

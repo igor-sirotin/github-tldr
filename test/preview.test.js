@@ -27,6 +27,20 @@ JSDOM.fromURL(file, { runScripts: 'dangerously', resources: 'usable', pretendToB
         'the hover styling lands on the content element, not the li');
       assert(styled.dataset.tldrMenu === 'actionlist', 'tagged as the actionlist variant');
 
+      // GitHub spaces these children with a margin rule aimed at every direct
+      // child, which an absolutely positioned overlay also picks up — and a
+      // right margin shrinks such a box rather than being ignored. The host's
+      // own children must keep that spacing; only the mesh opts out.
+      const win = dom.window;
+      const hostChild = entry.querySelector('.ActionList-item-visual');
+      assert(win.getComputedStyle(hostChild).marginRight.includes('control-medium-gap'),
+        "the preview really does reproduce GitHub's child-spacing rule");
+      const meshEl = entry.querySelector('.gh-tldr-mesh');
+      assert(win.getComputedStyle(meshEl).marginRight === '0px',
+        `the mesh opts out of it, so the fill is not shrunk on the right (got ${win.getComputedStyle(meshEl).marginRight})`);
+      assert(meshEl.style.getPropertyPriority('inset') === 'important',
+        'and its measured inset is set with priority, so a host rule cannot move it');
+
       // jsdom computes no geometry, so compare the boxes by proxy: the element
       // we fill must be the same kind of element, with the same classes, as the
       // one a neighbouring item fills. Then its border box — and so the fill's
@@ -113,6 +127,9 @@ JSDOM.fromURL(file, { runScripts: 'dangerously', resources: 'usable', pretendToB
     assert(doc.documentElement.dataset.previewTheme === 'dark', 'theme toggle works');
     doc.getElementById('clear').click();
     assert(seededPanel.hidden === true && panel.hidden === true, 'clear cache closes every panel again');
-    dom.window.close();
+    // content.js keeps a requestAnimationFrame loop alive; closing the window
+    // mid-callback makes jsdom throw, so stop the process instead.
+    try { dom.window.close(); } catch { /* raced the rAF loop */ }
+    process.exit(process.exitCode || 0);
   })
-  .catch((e) => { console.error('FAIL:', e.message); process.exitCode = 1; });
+  .catch((e) => { console.error('FAIL:', e.message); process.exit(1); });

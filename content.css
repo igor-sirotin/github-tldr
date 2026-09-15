@@ -194,7 +194,28 @@
    collapses them onto one point. Separate elements interpolate `transform`,
    which is cheap, continuous and independent per blob, and a real `blur()`
    melts the overlaps into one another the way a mesh gradient should. */
+/* GitHub spaces an item's children with rules that target every direct child,
+   e.g.
+     .ActionListContent > :not(:last-child, .Spacer) { margin-right: .5rem }
+   The mesh is a direct child too, so it was picking that up — and on an
+   absolutely positioned box with both `left` and `right` set, a right margin
+   reduces the used width rather than being ignored. That is the gap down the
+   right of the fill, and no amount of adjusting `inset` fixes it because the
+   box is being shrunk after the offsets resolve.
+
+   The mesh is a decorative overlay and must take no part in the item's layout,
+   so anything the host could use to space or place a child is neutralised.
+   `!important` is needed because those rules are more specific than a single
+   class, and the host's own children must keep their spacing — only this one
+   opts out. `grid-area` is included deliberately: a host rule assigning one
+   would change the mesh's containing block to a single grid cell. */
 .gh-tldr-mesh {
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  grid-area: auto !important;
+  flex: none !important;
+  float: none !important;
   position: absolute;
   inset: 0;
   /* No `grid-area`. ActionList's content element is a grid, and giving an
