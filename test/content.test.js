@@ -17,6 +17,19 @@ const menuItem = (label, extraClass = '', icon = 'octicon-link') => `
         </button>
       </span>`;
 
+// Primer's ActionList, with the hashed CSS-module names real GitHub ships —
+// not the plain .ActionList-content of the design's own preview. The hook sits
+// on the inner content button while role="menuitem" sits on the li.
+const actionListItem = (label, extraClass = '') => `
+      <li role="menuitem" class="prc-ActionList-ActionListItem-uq6I7">
+        <button type="button" class="prc-ActionList-ActionListContent-sg9-x ${extraClass}">
+          <span class="prc-ActionList-Visual-49ccF prc-ActionList-VisualWrap-rfjV5">
+            <svg class="octicon octicon-quote" width="16" height="16" aria-hidden="true"><path d="M0 0"/></svg>
+          </span>
+          <span class="prc-ActionList-ItemLabel-TSrdx">${label}</span>
+        </button>
+      </li>`;
+
 const classicMenu = (id) => `
   <details class="details-overlay" id="${id}-details">
     <summary class="timeline-comment-action" id="${id}-kebab">…</summary>
@@ -60,7 +73,7 @@ const dom = new JSDOM(`<!doctype html><body>
     </div>
   </review-thread-collapsible>
 
-  <!-- React issue description: the menu is portalled out of the comment. -->
+  <!-- React issue description: Primer ActionList, portalled out of the comment. -->
   <div data-testid="issue-body" class="react-issue-body">
     <div class="ActivityHeader-module__activityHeader__xxxx">
       <button id="issue-kebab" aria-haspopup="true">…</button>
@@ -120,6 +133,8 @@ assert(!entryA.textContent.includes('Quote'), 'the cloned label is gone');
 // --- the design: gradient label, gradient icon, mesh hover fill ---
 assert(actionable(entryA).classList.contains('gh-tldr-menu-item'),
   'the styled class lands on the element GitHub hovers, not the layout wrapper');
+assert(actionable(entryA).dataset.tldrMenu === 'dropdown',
+  `the legacy menu is tagged as the dropdown variant (got ${actionable(entryA).dataset.tldrMenu})`);
 const labelEl = entryA.querySelector('.gh-tldr-label');
 assert(labelEl && labelEl.textContent === 'TLDR', 'label is wrapped so the gradient has something to paint');
 
@@ -211,39 +226,38 @@ assert(sent.filter((m) => m.type === 'peek').length === 5,
   // --- portalled menu: resolved through the trigger that opened it ---
   const issueBody = doc.querySelector('[data-testid="markdown-body"]');
   const portal = doc.createElement('div');
-  portal.innerHTML = `<div role="menu" id="portal-menu">
-    <li role="menuitem" class="prc-ActionList-ActionListItem">
-      <div class="prc-ActionList-ActionListContent">
-        <span class="prc-ActionList-LeadingVisual"><svg class="octicon" width="16" height="16"></svg></span>
-        <span class="prc-ActionList-ItemLabel">Copy link</span>
-      </div>
-    </li>
-    <li role="menuitem" class="prc-ActionList-ActionListItem js-comment-quote-reply">
-      <div class="prc-ActionList-ActionListContent">
-        <span class="prc-ActionList-LeadingVisual"><svg class="octicon" width="16" height="16"></svg></span>
-        <span class="prc-ActionList-ItemLabel">Quote reply</span>
-      </div>
-    </li>
-  </div>`;
+  portal.innerHTML = `<ul role="menu" id="portal-menu">
+    ${actionListItem('Copy link')}
+    ${actionListItem('Quote reply', 'js-comment-quote-reply')}
+  </ul>`;
   doc.getElementById('issue-kebab').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
   doc.body.appendChild(portal); // Primer renders the menu at the end of the document
   await new Promise((r) => setTimeout(r, 300));
 
   const portalEntry = portal.querySelector('.gh-tldr-entry');
-  assert(portalEntry, 'portalled menu gets an entry too');
-  assert(portalEntry.previousElementSibling === portal.querySelector('.js-comment-quote-reply'), 'entry follows Quote reply in the portalled menu');
+  assert(portalEntry, 'portalled menu gets an entry too — the hook is on a descendant, not the menuitem itself');
+  const quoteRow = portal.querySelector('.js-comment-quote-reply').closest('[role="menuitem"]');
+  assert(portalEntry.previousElementSibling === quoteRow, 'entry follows the Quote reply row in the portalled menu');
   assert(portalEntry.querySelector('svg.gh-tldr-wand'), 'icon is included, because this menu uses icons');
 
-  // Primer nests the glyph in a slot that already spaces it; an extra margin
-  // there is what pushed the label right in the React issue view.
-  const portalItem = actionable(portalEntry);
+  // ActionList paints its hover on the content element inside the li, so that
+  // is where the styling class and the variant tag must land.
+  const portalItem = portalEntry.querySelector('.gh-tldr-menu-item');
+  assert(portalItem, 'ActionList entry has a styled element');
+  assert(portalItem !== portalEntry, 'which is the content element, not the cloned li');
+  assert(portalItem.className.includes('prc-ActionList-ActionListContent'),
+    'the styled element is the ActionList content element, matched by its hashed module name');
+  assert(portalItem.dataset.tldrMenu === 'actionlist',
+    `ActionList is tagged as such, so content.css can shape it (got ${portalItem.dataset.tldrMenu})`);
+  assert(portalEntry.tagName === 'LI' && portalEntry.classList.contains('gh-tldr-entry'),
+    'the li carries only the entry class, so it adds no second hover box');
+  assert(!portalEntry.classList.contains('gh-tldr-menu-item'), 'and is not itself styled as the item');
+
   const portalWand = portalEntry.querySelector('svg.gh-tldr-wand');
-  assert(portalWand.parentElement !== portalItem,
-    'slot layout: the wand is not a direct child, so the margin rule must not match it');
-  assert(portalWand.closest('.prc-ActionList-LeadingVisual'), 'wand stays in the leading-visual slot');
+  assert(portalWand.closest('[class*="prc-ActionList-Visual"]'), 'wand stays in the visual slot');
 
   const portalLabel = portalEntry.querySelector('.gh-tldr-label');
-  assert(portalLabel.classList.contains('prc-ActionList-ItemLabel'),
+  assert(portalLabel.className.includes('prc-ActionList-ItemLabel'),
     "the label is GitHub's own label element, re-used rather than wrapped in another span");
   assert(portalLabel.children.length === 0 && portalLabel.textContent === 'TLDR',
     'no extra element is nested inside the label');

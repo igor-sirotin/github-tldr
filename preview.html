@@ -108,36 +108,44 @@
   .tldr-menu > summary:hover { background: var(--bgColor-neutral-muted); color: var(--fgColor-default); }
   .dropdown-menu {
     position: absolute; right: 0; top: 100%; z-index: 20; min-width: 200px;
-    display: block; padding: 4px; margin-top: 4px;
+    display: block; padding: 0; margin-top: 4px;
     background: var(--bgColor-default); border: 1px solid var(--borderColor-default);
     border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,.16); text-align: left;
   }
+  /* Legacy items are full-width square rows — no radius, no menu padding. */
   .dropdown-item {
-    display: flex; align-items: center; width: 100%; padding: 6px 8px; border: 0;
-    border-radius: 6px; background: none;
+    display: flex; align-items: center; width: 100%; padding: 6px 12px; border: 0;
+    border-radius: 0; background: none;
     font: 400 14px/20px inherit; color: var(--fgColor-default); text-align: left;
     cursor: pointer; white-space: nowrap;
   }
-  /* Octicons are filled; the extension's Lucide glyph is stroked, so it opts out. */
-  .dropdown-item svg:not(.gh-tldr-wand) { width: 16px; height: 16px; flex: none; margin-right: 8px; fill: currentColor; }
+  /* The legacy comment menu carries no icons, which is why the entry adds none
+     there either — see makeMenuItem's icon-suppression branch. */
   .dropdown-item:hover { background: var(--bgColor-accent-emphasis); color: #fff; }
   .dropdown-item.danger { color: var(--fgColor-danger); }
   .dropdown-item.danger:hover { background: var(--fgColor-danger); color: #fff; }
   .dropdown-divider { height: 1px; margin: 4px 0; background: var(--borderColor-default); }
 
-  .prc-ActionList-ActionList {
-    position: absolute; right: 0; top: 100%; z-index: 20; min-width: 200px;
-    display: block; padding: 4px; margin-top: 4px; list-style: none;
-    background: var(--bgColor-default); border: 1px solid var(--borderColor-default);
-    border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,.16); text-align: left;
+  /* The ActionList menu keeps its own 8px padding; the legacy one has none. */
+  .dropdown-menu.ActionList { padding: 8px; }
+
+  /* Primer ActionList: the li is a list row, the .ActionList-content inside it
+     is the padded, rounded box that takes the hover. */
+  .ActionList { list-style: none; margin: 0; padding: 8px; display: grid; gap: 2px; }
+  .ActionList-item { margin: 0; }
+  .ActionList-content {
+    display: flex; align-items: center; gap: 8px; width: 100%;
+    padding: 6px 8px; border: 0; border-radius: 6px; background: none;
+    font: 400 14px/20px inherit; color: var(--fgColor-default); text-align: left;
+    cursor: pointer; white-space: nowrap;
   }
-  .prc-ActionList-ActionListItem { display: block; border-radius: 6px; cursor: pointer; }
-  .prc-ActionList-ActionListContent {
-    display: grid; grid-template-columns: 16px 1fr; align-items: center; gap: 8px;
-    padding: 6px 8px; font: 400 14px/20px inherit; color: var(--fgColor-default);
-  }
-  .prc-ActionList-LeadingVisual svg { width: 16px; height: 16px; fill: currentColor; }
-  .prc-ActionList-ActionListItem:hover { background: var(--bgColor-accent-emphasis); color: #fff; }
+  .ActionList-content:hover { background: var(--bgColor-neutral-muted); }
+  .ActionList-item-visual { display: flex; align-items: center; }
+  .ActionList-item-visual svg:not(.gh-tldr-wand) { width: 16px; height: 16px; fill: currentColor; }
+  .ActionList-item--danger .ActionList-content { color: var(--fgColor-danger); }
+  .ActionList-divider { height: 1px; margin: 8px -8px; background: var(--borderColor-default); }
+
+  .states .variant-label { margin: 0 0 8px; font-size: 12px; color: var(--fgColor-muted); }
 
   .states { padding: 16px; background: var(--bgColor-default); border: 1px solid var(--borderColor-default); border-radius: 6px; }
   .states .label { display: block; font: 500 11px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--fgColor-muted); margin-bottom: 12px; }
@@ -161,7 +169,7 @@
   <div class="bar">
     <div>
       <h1>GitHub TLDR — local preview</h1>
-      <p>Runs the real <code>content.js</code> and <code>content.css</code> against fake comments. Open any <code>···</code> menu: <strong>TLDR</strong> sits under <em>Quote reply</em>. No extension install, no API key.</p>
+      <p>Runs the real <code>content.js</code> and <code>content.css</code> against fake comments. Open any <code>···</code> menu: <strong>TLDR</strong> sits under <em>Quote reply</em>, in both of GitHub's menu systems. No extension install, no API key.</p>
     </div>
     <span class="spacer"></span>
     <button type="button" id="clear">Clear cache</button>
@@ -172,14 +180,23 @@
        hovered) without clicking anything. Built from the same template as the
        menus below, inside a comment long enough to qualify. -->
   <div class="states timeline-comment js-comment-container">
-    <span class="label">Menu entry — always open</span>
-    <div class="tldr-menu-slot" data-open="1"></div>
+    <span class="label">Menu entry — always open, both menu systems</span>
+    <div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap">
+      <div>
+        <p class="variant-label">Legacy <code>details-menu</code> — PR timeline, no icons</p>
+        <div class="tldr-menu-slot" data-open="1"></div>
+      </div>
+      <div>
+        <p class="variant-label">Primer <code>ActionList</code> — React issue view, with icons</p>
+        <div class="tldr-menu-slot" data-open="1" data-menu="actionlist"></div>
+      </div>
+    </div>
     <div class="js-comment-body" hidden>
       This fixture exists only to give the always-open menu above a comment of its own, long
       enough to pass the minimum-length check in the content script so that the TLDR entry is
       actually added to it.
     </div>
-    <p class="hint">Hover the entry to see the animated gradient fill. Compare against <em>Delete</em>, which recolours its foreground the same way.</p>
+    <p class="hint">Hover the entry in each menu. The two differ in shape — the legacy item is a full-bleed row, the ActionList hover is an inset rounded box — and the entry is cloned structurally so it follows whichever it joined.</p>
   </div>
 
   <div class="states">
@@ -294,7 +311,7 @@
         <strong>octocat</strong> opened this issue · Issue description (React view)
         <div class="IssueBodyHeader-module__badgesSection__demo" style="display:flex;align-items:center;gap:8px;margin-left:auto">
           <div class="IssueBodyHeader-module__badgeGroup__demo"><span class="Label">Collaborator</span></div>
-          <div class="IssueBodyHeader-module__actionsSection__demo tldr-menu-slot" data-menu="primer"></div>
+          <div class="IssueBodyHeader-module__actionsSection__demo tldr-menu-slot" data-menu="actionlist"></div>
         </div>
       </div>
     </div>
@@ -316,50 +333,40 @@
 <template id="menu-template">
   <details class="tldr-menu"><summary title="Show options">···</summary>
     <details-menu class="dropdown-menu" role="menu">
-      <span><button type="button" class="dropdown-item" role="menuitem"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M7.775 3.275a.75.75 0 0 0 1.06 1.06l1.25-1.25a2 2 0 1 1 2.83 2.83l-2.5 2.5a2 2 0 0 1-2.83 0 .75.75 0 0 0-1.06 1.06 3.5 3.5 0 0 0 4.95 0l2.5-2.5a3.5 3.5 0 0 0-4.95-4.95l-1.25 1.25Zm-4.69 9.64a2 2 0 0 1 0-2.83l2.5-2.5a2 2 0 0 1 2.83 0 .75.75 0 0 0 1.06-1.06 3.5 3.5 0 0 0-4.95 0l-2.5 2.5a3.5 3.5 0 0 0 4.95 4.95l1.25-1.25a.75.75 0 0 0-1.06-1.06l-1.25 1.25a2 2 0 0 1-2.83 0Z"/></svg>Copy link</button></span>
-      <span><button type="button" class="dropdown-item" role="menuitem"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z"/><path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z"/></svg>Copy Markdown</button></span>
-      <span><button type="button" class="dropdown-item js-comment-quote-reply" role="menuitem"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.75 2.5h12.5a.25.25 0 0 1 .25.25v8.5a.25.25 0 0 1-.25.25H8.061a.75.75 0 0 0-.53.22L5 14.311V11.75a.75.75 0 0 0-.75-.75H1.75a.25.25 0 0 1-.25-.25v-8.5a.25.25 0 0 1 .25-.25ZM14.25 1H1.75A1.75 1.75 0 0 0 0 2.75v8.5C0 12.216.784 13 1.75 13H3.5v3.25a.75.75 0 0 0 1.28.53L8.81 13h5.44A1.75 1.75 0 0 0 16 11.25v-8.5A1.75 1.75 0 0 0 14.25 1Z"/></svg>Quote reply</button></span>
+      <span><button type="button" class="dropdown-item" role="menuitem">Copy link</button></span>
+      <span><button type="button" class="dropdown-item" role="menuitem">Copy Markdown</button></span>
+      <span><button type="button" class="dropdown-item js-comment-quote-reply" role="menuitem">Quote reply</button></span>
       <div class="dropdown-divider"></div>
-      <span><button type="button" class="dropdown-item" role="menuitem"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11.013 1.427a1.75 1.75 0 0 1 2.474 0l1.086 1.086a1.75 1.75 0 0 1 0 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a1.125 1.125 0 0 1-1.392-1.392l.93-3.25c.081-.286.235-.547.445-.758l8.61-8.61Zm.176 4.823L9.75 4.81l-6.286 6.287a.253.253 0 0 0-.064.108l-.558 1.953 1.953-.558a.253.253 0 0 0 .108-.064Zm1.238-3.763a.25.25 0 0 0-.354 0L10.811 3.75l1.439 1.44 1.263-1.263a.25.25 0 0 0 0-.354Z"/></svg>Edit</button></span>
-      <span><button type="button" class="dropdown-item danger" role="menuitem"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11 1.75V3h2.25a.75.75 0 0 1 0 1.5H2.75a.75.75 0 0 1 0-1.5H5V1.75C5 .784 5.784 0 6.75 0h2.5C10.216 0 11 .784 11 1.75ZM4.496 6.675l.66 6.6a.25.25 0 0 0 .249.225h5.19a.25.25 0 0 0 .249-.225l.66-6.6a.75.75 0 0 1 1.492.149l-.66 6.6A1.75 1.75 0 0 1 10.595 15h-5.19a1.75 1.75 0 0 1-1.741-1.575l-.66-6.6a.75.75 0 1 1 1.492-.15ZM6.5 1.75V3h3V1.75a.25.25 0 0 0-.25-.25h-2.5a.25.25 0 0 0-.25.25Z"/></svg>Delete</button></span>
+      <span><button type="button" class="dropdown-item" role="menuitem">Edit</button></span>
+      <span><button type="button" class="dropdown-item danger" role="menuitem">Delete</button></span>
     </details-menu>
   </details>
 </template>
 
 
-<template id="menu-template-primer">
+<!-- Primer ActionList, as used by the React issue view: an <li role="menuitem">
+     wrapping .ActionList-content, which is the element that takes the hover. -->
+<template id="menu-template-actionlist">
   <details class="tldr-menu"><summary title="Show options">···</summary>
-    <div class="prc-ActionList-ActionList" role="menu">
-      <li role="menuitem" class="prc-ActionList-ActionListItem">
-        <div class="prc-ActionList-ActionListContent">
-          <span class="prc-ActionList-LeadingVisual"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M7.775 3.275a.75.75 0 0 0 1.06 1.06l1.25-1.25a2 2 0 1 1 2.83 2.83l-2.5 2.5a2 2 0 0 1-2.83 0 .75.75 0 0 0-1.06 1.06 3.5 3.5 0 0 0 4.95 0l2.5-2.5a3.5 3.5 0 0 0-4.95-4.95l-1.25 1.25Z"/></svg></span>
-          <span class="prc-ActionList-ItemLabel">Copy link</span>
-        </div>
-      </li>
-      <li role="menuitem" class="prc-ActionList-ActionListItem js-comment-quote-reply">
-        <div class="prc-ActionList-ActionListContent">
-          <span class="prc-ActionList-LeadingVisual"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.75 2.5h12.5a.25.25 0 0 1 .25.25v8.5a.25.25 0 0 1-.25.25H8.061a.75.75 0 0 0-.53.22L5 14.311V11.75a.75.75 0 0 0-.75-.75H1.75a.25.25 0 0 1-.25-.25v-8.5a.25.25 0 0 1 .25-.25Z"/></svg></span>
-          <span class="prc-ActionList-ItemLabel">Quote reply</span>
-        </div>
-      </li>
-      <div class="dropdown-divider"></div>
-      <li role="menuitem" class="prc-ActionList-ActionListItem">
-        <div class="prc-ActionList-ActionListContent">
-          <span class="prc-ActionList-LeadingVisual"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11.013 1.427a1.75 1.75 0 0 1 2.474 0l1.086 1.086a1.75 1.75 0 0 1 0 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a1.125 1.125 0 0 1-1.392-1.392l.93-3.25c.081-.286.235-.547.445-.758l8.61-8.61Z"/></svg></span>
-          <span class="prc-ActionList-ItemLabel">Edit</span>
-        </div>
-      </li>
-    </div>
+    <ul class="dropdown-menu ActionList" role="menu">
+        <li class="ActionList-item" role="menuitem"><button type="button" class="ActionList-content"><span class="ActionList-item-visual"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M7.775 3.275a.75.75 0 0 0 1.06 1.06l1.25-1.25a2 2 0 1 1 2.83 2.83l-2.5 2.5a2 2 0 0 1-2.83 0 .75.75 0 0 0-1.06 1.06 3.5 3.5 0 0 0 4.95 0l2.5-2.5a3.5 3.5 0 0 0-4.95-4.95l-1.25 1.25Zm-4.69 9.64a2 2 0 0 1 0-2.83l2.5-2.5a2 2 0 0 1 2.83 0 .75.75 0 0 0 1.06-1.06 3.5 3.5 0 0 0-4.95 0l-2.5 2.5a3.5 3.5 0 0 0 4.95 4.95l1.25-1.25a.75.75 0 0 0-1.06-1.06l-1.25 1.25a2 2 0 0 1-2.83 0Z"/></svg></span><span class="ActionList-item-label">Copy link</span></button></li>
+        <li class="ActionList-item" role="menuitem"><button type="button" class="ActionList-content js-comment-quote-reply"><span class="ActionList-item-visual"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.75 2.5h12.5a.25.25 0 0 1 .25.25v8.5a.25.25 0 0 1-.25.25H8.061a.75.75 0 0 0-.53.22L5 14.311V11.75a.75.75 0 0 0-.75-.75H1.75a.25.25 0 0 1-.25-.25v-8.5a.25.25 0 0 1 .25-.25ZM14.25 1H1.75A1.75 1.75 0 0 0 0 2.75v8.5C0 12.216.784 13 1.75 13H3.5v3.25a.75.75 0 0 0 1.28.53L8.81 13h5.44A1.75 1.75 0 0 0 16 11.25v-8.5A1.75 1.75 0 0 0 14.25 1Z"/></svg></span><span class="ActionList-item-label">Quote reply</span></button></li>
+        <li class="ActionList-item" role="menuitem"><button type="button" class="ActionList-content"><span class="ActionList-item-visual"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11.013 1.427a1.75 1.75 0 0 1 2.474 0l1.086 1.086a1.75 1.75 0 0 1 0 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a1.125 1.125 0 0 1-1.392-1.392l.93-3.25c.081-.286.235-.547.445-.758l8.61-8.61Z"/></svg></span><span class="ActionList-item-label">Edit</span></button></li>
+      <li class="ActionList-divider" aria-hidden="true"></li>
+        <li class="ActionList-item ActionList-item--danger" role="menuitem"><button type="button" class="ActionList-content"><span class="ActionList-item-visual"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11 1.75V3h2.25a.75.75 0 0 1 0 1.5H2.75a.75.75 0 0 1 0-1.5H5V1.75C5 .784 5.784 0 6.75 0h2.5C10.216 0 11 .784 11 1.75ZM4.496 6.675l.66 6.6a.25.25 0 0 0 .249.225h5.19a.25.25 0 0 0 .249-.225l.66-6.6a.75.75 0 0 1 1.492.149l-.66 6.6A1.75 1.75 0 0 1 10.595 15h-5.19a1.75 1.75 0 0 1-1.741-1.575l-.66-6.6a.75.75 0 1 1 1.492-.15Z"/></svg></span><span class="ActionList-item-label">Delete</span></button></li>
+    </ul>
   </details>
 </template>
 
 <script>
   // Fill every menu slot from the template before content.js runs.
   const tpl = document.getElementById('menu-template');
-  const tplPrimer = document.getElementById('menu-template-primer');
+  const templates = {
+    dropdown: tpl,
+    actionlist: document.getElementById('menu-template-actionlist'),
+  };
   for (const slot of document.querySelectorAll('.tldr-menu-slot')) {
-    // The React issue view renders Primer's ActionList, not a details-menu.
-    const source = slot.dataset.menu === 'primer' ? tplPrimer : tpl;
+    const source = templates[slot.dataset.menu || 'dropdown'];
     const menu = source.content.firstElementChild.cloneNode(true);
     if (slot.dataset.open === '1') {
       menu.open = true;

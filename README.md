@@ -103,13 +103,20 @@ Finding the right spot without knowing GitHub's class names:
   enough: any wrapper or attribute GitHub styles on is lost and native button
   chrome shows through. Cloning means the extension ships **no** menu styling at
   all, so the entry cannot drift from its neighbours.
-- **Add no spacing the layout already provides.** The gap after the glyph is
-  applied with a child combinator (`.gh-tldr-menu-item > .gh-tldr-wand`), so it
-  only lands in the classic menu where the svg is a direct child. Primer's
-  ActionList puts the glyph in a leading-visual slot that has its own gap, and
-  adding to that pushes the label right. For the same reason, where GitHub
-  already wraps the label in an element of its own, that element is re-used
-  rather than having another span nested inside it.
+- **Know which menu you are in.** GitHub ships two implementations, shaped
+  differently rather than merely styled differently. The legacy `details-menu`
+  is a `<button class="dropdown-item" role="menuitem">` whose hover is a
+  full-bleed accent row; Primer's `ActionList` is an `<li role="menuitem">`
+  wrapping a content element, and the hover is an inset rounded fill on *that
+  element*, not the li. So the styling class lands on the content element where
+  there is one, tagged `data-tldr-menu="actionlist"` or `"dropdown"` so
+  `content.css` can shape each correctly — radius, icon gap, and whether the
+  foreground flips to white on hover. Real GitHub ships ActionList with hashed
+  CSS-module names, so the content element is matched by substring.
+- **Add no spacing the layout already provides.** Where GitHub already wraps
+  the label in an element of its own, that element is re-used rather than having
+  another span nested inside it, and the icon's margin is dropped in ActionList,
+  whose content element owns that gap.
 - **Re-colour, don't re-layout.** `content.css` sets no geometry on the entry at
   all — height, padding, font and icon gap are GitHub's. It only adds colour:
   the label carries an animated multi-hue ramp via `background-clip: text`, the

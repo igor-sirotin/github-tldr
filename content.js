@@ -21,6 +21,25 @@ const QUOTE_LABEL = /^quote reply$/i;
 // or Primer's ActionList.
 const MENU_ITEM_SELECTORS = ['[role="menuitem"]', '.dropdown-item'];
 
+// GitHub ships two menu implementations, shaped differently rather than merely
+// styled differently:
+//
+//   legacy `details-menu`  <button class="dropdown-item" role="menuitem">,
+//                          hover is a full-bleed accent row, foreground white.
+//   Primer `ActionList`    <li role="menuitem"> wrapping a content element,
+//                          hover is an inset rounded fill on THAT content
+//                          element, not on the li.
+//
+// So the hover styling has to land on the content element where there is one.
+// Real GitHub ships these as hashed CSS-module names
+// (prc-ActionList-ActionListContent-xxxxx), hence the substring match.
+const CONTENT_SELECTORS = [
+  ':scope > [class*="ActionList-content"]',
+  ':scope > [class*="ActionListContent"]',
+  ':scope > button',
+  ':scope > a',
+];
+
 // Containers we must not climb out of when looking for the entry's outer cell.
 const MENU_SELECTORS = ['details-menu', '[role="menu"]', '.dropdown-menu', 'action-menu'];
 
@@ -171,8 +190,12 @@ function wandIcon() {
   return svg;
 }
 
+// Matched against descendants as well as the element itself: role="menuitem"
+// sits on the <li> in ActionList while the hook sits on the inner content
+// button. The label regex is no fallback there — a collapsed menu has no
+// rendered text at all, and a non-English UI never matches it.
 function isQuoteReply(el) {
-  if (QUOTE_SELECTORS.some((sel) => el.matches(sel))) return true;
+  if (QUOTE_SELECTORS.some((sel) => el.matches(sel) || el.querySelector(sel))) return true;
   return QUOTE_LABEL.test(textOf(el));
 }
 
@@ -243,8 +266,21 @@ function makeMenuItem(cell) {
   // content.css styles the element GitHub itself hovers and fills — the
   // actionable one — not the layout wrapper around it.
   const selector = MENU_ITEM_SELECTORS.join(',');
-  const item = entry.matches(selector) ? entry : entry.querySelector(selector) || entry;
+  const outer = entry.matches(selector) ? entry : entry.querySelector(selector) || entry;
+
+  // In ActionList that is the content element inside the li, not the li.
+  let item = outer;
+  for (const sel of CONTENT_SELECTORS) {
+    const content = outer.querySelector(sel);
+    if (content) {
+      item = content;
+      break;
+    }
+  }
+
   item.classList.add(MENU_ITEM_CLASS);
+  item.dataset.tldrMenu = item === outer ? 'dropdown' : 'actionlist';
+  item.title = 'Summarize this comment with AI';
 
   // Swap the glyph in place, keeping whatever wrapper and sizing GitHub gave it.
   const icon = item.querySelector('svg');

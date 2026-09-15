@@ -1,13 +1,39 @@
 /* GitHub TLDR — ... menu entry + summary panel */
 
-/* The entry clones the neighbouring menu item's classes, so GitHub styles it:
-   same height, padding, font, icon gap and hover geometry as Quote reply or
-   Delete. Everything below only re-colours it — the way Delete re-colours its
-   own foreground — and adds the hover accent. No layout, no sizing. */
+/* The entry is cloned from the neighbouring menu item — same tag, same wrapper
+   chain, same classes — so GitHub styles it: height, padding, font, icon gap
+   and hover geometry all come from whichever menu it joined. Everything below
+   only re-colours it, the way Delete re-colours its own foreground.
+   `data-tldr-menu` records which of the two implementations it landed in
+   (see makeMenuItem in content.js); the mesh needs no per-variant geometry
+   because it inherits the host's radius and box. */
 
 .gh-tldr-menu-item {
   position: relative;
   overflow: hidden;
+}
+
+/* ActionList paints its hover on the content element, which is inset from the
+   li and rounded; the mesh must not spill past that box. */
+.gh-tldr-menu-item[data-tldr-menu="actionlist"] {
+  border-radius: var(--borderRadius-medium, 6px);
+}
+
+/* The legacy item's hover is a full-width square row, so the mesh is too. */
+.gh-tldr-menu-item[data-tldr-menu="dropdown"] {
+  border-radius: 0;
+}
+
+/* ActionList's content element owns the gap between the visual slot and the
+   label, so the icon must not add its own margin on top of it. */
+.gh-tldr-menu-item[data-tldr-menu="actionlist"] .gh-tldr-wand {
+  margin-right: 0;
+}
+
+/* The li we cloned carries ActionList's own list geometry; it must not add a
+   second hover box of its own. */
+.gh-tldr-entry {
+  background: none;
 }
 
 /* Icon: same 16px box and currentColor GitHub gives menu-item octicons. */
@@ -16,6 +42,7 @@
   height: 16px;
   flex: none;
   vertical-align: text-bottom;
+  margin-right: 8px;
   /* Stroked with the same four hues as the label, along the wand's diagonal.
      SVG cannot take a CSS gradient as `stroke`, so content.js injects one
      hidden <svg> paint server and the stop colours are set here. */
@@ -30,12 +57,13 @@
 .gh-tldr-stop-3 { stop-color: var(--tldr-3); }
 .gh-tldr-stop-4 { stop-color: var(--tldr-4); }
 
-/* Hovered, the fill carries the colour and the icon goes white with the text,
-   so it drops back to currentColor. */
-.gh-tldr-menu-item:hover .gh-tldr-wand,
-.gh-tldr-menu-item:focus .gh-tldr-wand,
-.gh-tldr-menu-item:focus-visible .gh-tldr-wand,
-.gh-tldr-menu-item[aria-selected="true"] .gh-tldr-wand {
+/* Hovered in the legacy menu, the fill carries the colour and the icon goes
+   white with the text, so it drops back to currentColor. ActionList is left
+   alone: its own items keep their foreground on hover. */
+.gh-tldr-menu-item[data-tldr-menu="dropdown"]:hover .gh-tldr-wand,
+.gh-tldr-menu-item[data-tldr-menu="dropdown"]:focus .gh-tldr-wand,
+.gh-tldr-menu-item[data-tldr-menu="dropdown"]:focus-visible .gh-tldr-wand,
+.gh-tldr-menu-item[data-tldr-menu="dropdown"][aria-selected="true"] .gh-tldr-wand {
   stroke: currentColor;
 }
 
@@ -155,13 +183,6 @@
   z-index: 1;
 }
 
-/* Gap after the glyph, but only where the glyph is a direct child and nothing
-   else is spacing it. Primer's ActionList puts it in a leading-visual slot
-   that already has its own gap, and adding to that pushes the label right. */
-.gh-tldr-menu-item > .gh-tldr-wand {
-  margin-right: 8px;
-}
-
 /* Hover fill: an animated mesh gradient. Seven colour blobs are real elements
    (built by content.js), each a blurred circle on its own path at its own
    duration, inside a clipping frame over an opaque base.
@@ -174,6 +195,7 @@
 .gh-tldr-mesh {
   position: absolute;
   inset: 0;
+  grid-area: 1 / 1;
   z-index: 0;
   overflow: hidden;
   border-radius: inherit;
@@ -282,17 +304,25 @@
   100% { transform: translate(-58%, 26%) scale(1.1); }
 }
 
-/* Hover: standard menu items take a solid fill, so this one does too — here
-   the drifting mesh — and the label and icon turn white with it, the way every
-   other item's foreground flips. */
+/* Hover: the drifting mesh replaces whatever fill the host menu would paint.
+   Foreground follows the host's convention — the legacy item flips its text
+   and icon to white with its accent fill, so this one does too; ActionList
+   items keep their foreground on a neutral hover, so the gradient label and
+   icon are left in place there. */
 .gh-tldr-menu-item:hover,
 .gh-tldr-menu-item:focus,
 .gh-tldr-menu-item:focus-visible,
 .gh-tldr-menu-item[aria-selected="true"] {
   background-color: transparent !important;
   background-image: linear-gradient(var(--tldr-base), var(--tldr-base)) !important;
-  color: #ffffff !important;
   outline: none;
+}
+
+.gh-tldr-menu-item[data-tldr-menu="dropdown"]:hover,
+.gh-tldr-menu-item[data-tldr-menu="dropdown"]:focus,
+.gh-tldr-menu-item[data-tldr-menu="dropdown"]:focus-visible,
+.gh-tldr-menu-item[data-tldr-menu="dropdown"][aria-selected="true"] {
+  color: #ffffff !important;
 }
 
 .gh-tldr-menu-item:hover .gh-tldr-mesh,
@@ -302,10 +332,10 @@
   opacity: 1;
 }
 
-.gh-tldr-menu-item:hover .gh-tldr-label,
-.gh-tldr-menu-item:focus .gh-tldr-label,
-.gh-tldr-menu-item:focus-visible .gh-tldr-label,
-.gh-tldr-menu-item[aria-selected="true"] .gh-tldr-label {
+.gh-tldr-menu-item[data-tldr-menu="dropdown"]:hover .gh-tldr-label,
+.gh-tldr-menu-item[data-tldr-menu="dropdown"]:focus .gh-tldr-label,
+.gh-tldr-menu-item[data-tldr-menu="dropdown"]:focus-visible .gh-tldr-label,
+.gh-tldr-menu-item[data-tldr-menu="dropdown"][aria-selected="true"] .gh-tldr-label {
   background-image: none;
   color: #ffffff;
   -webkit-text-fill-color: #ffffff;

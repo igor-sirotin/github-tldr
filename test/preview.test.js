@@ -13,21 +13,34 @@ JSDOM.fromURL(file, { runScripts: 'dangerously', resources: 'usable', pretendToB
     const click = (el) => el.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
 
     const menus = doc.querySelectorAll('details-menu');
-    assert(menus.length === 7, `classic menus: one per comment plus the always-open demo (got ${menus.length})`);
+    assert(menus.length === 7, `legacy menus: one per comment plus the always-open demo (got ${menus.length})`);
 
     // The React issue view renders Primer's slot layout, where the glyph has its
     // own gap — the shape that showed a stray margin as padding on the label.
-    const primer = doc.querySelector('.prc-ActionList-ActionList');
-    assert(primer, 'the issue-view mock uses a Primer ActionList');
-    const primerEntry = primer.querySelector('.gh-tldr-entry');
-    assert(primerEntry, 'Primer menu gets an entry too');
-    const primerWand = primerEntry.querySelector('.gh-tldr-wand');
-    assert(primerWand.closest('.prc-ActionList-LeadingVisual'), 'wand sits in the leading-visual slot');
-    assert(primerWand.parentElement !== primerEntry.querySelector('.gh-tldr-menu-item'),
-      'wand is not a direct child there, so it takes no extra margin');
-    assert(primerEntry.querySelector('.gh-tldr-label').classList.contains('prc-ActionList-ItemLabel'),
-      "Primer's own label element is re-used rather than wrapped");
-    assert(doc.querySelectorAll('.gh-tldr-entry').length === 8, 'every menu gets a TLDR entry');
+    const lists = doc.querySelectorAll('ul.ActionList');
+    assert(lists.length === 2, `both ActionList menus are present (got ${lists.length})`);
+    for (const list of lists) {
+      const entry = list.querySelector('.gh-tldr-entry');
+      assert(entry && entry.tagName === 'LI', 'ActionList menu gets an <li> entry');
+      const styled = entry.querySelector('.gh-tldr-menu-item');
+      assert(styled && styled.classList.contains('ActionList-content'),
+        'the hover styling lands on the content element, not the li');
+      assert(styled.dataset.tldrMenu === 'actionlist', 'tagged as the actionlist variant');
+      assert(entry.querySelector('.gh-tldr-wand').closest('.ActionList-item-visual'),
+        'wand sits in the visual slot');
+      assert(entry.querySelector('.gh-tldr-label').classList.contains('ActionList-item-label'),
+        "ActionList's own label element is re-used rather than wrapped");
+      const labels = [...list.querySelectorAll('[role="menuitem"]')].map((el) => el.textContent.trim());
+      assert(labels[labels.indexOf('Quote reply') + 1] === 'TLDR', `TLDR follows Quote reply (${labels.join(' | ')})`);
+    }
+
+    // The legacy menu has no icons at all, so the entry adds none there either.
+    const legacyEntry = doc.querySelector('details-menu:not(.ActionList) .gh-tldr-entry');
+    assert(legacyEntry, 'legacy menu gets an entry');
+    assert(!legacyEntry.querySelector('svg'), 'and no icon, because that menu has none');
+    assert(legacyEntry.querySelector('.gh-tldr-menu-item').dataset.tldrMenu === 'dropdown',
+      'tagged as the dropdown variant');
+    assert(doc.querySelectorAll('.gh-tldr-entry').length === 9, 'every menu in both systems gets a TLDR entry');
     assert(doc.querySelectorAll('.gh-tldr-btn').length === 0, 'no injected buttons remain in the preview');
 
     // The design's inspection aids.
@@ -45,7 +58,6 @@ JSDOM.fromURL(file, { runScripts: 'dangerously', resources: 'usable', pretendToB
       assert(entry.compareDocumentPosition(menu.querySelector('.dropdown-divider')) & 4, 'entry is in the first section');
       const sibling = menu.querySelector('.js-comment-quote-reply').parentElement;
       assert(entry.tagName === sibling.tagName, 'entry matches the wrapper element of a real item');
-      assert(entry.querySelector('svg.gh-tldr-wand'), 'entry carries the wand in the native icon slot');
       assert(entry.querySelector('.gh-tldr-label').textContent === 'TLDR', 'label is wrapped for the gradient');
       assert(entry.querySelectorAll('.gh-tldr-blob').length === 7, 'entry carries the seven-blob hover mesh');
     }
