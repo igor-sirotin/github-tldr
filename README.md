@@ -117,16 +117,19 @@ Finding the right spot without knowing GitHub's class names:
   the label in an element of its own, that element is re-used rather than having
   another span nested inside it, and the icon's margin is dropped in ActionList,
   whose content element owns that gap.
-- **Let exactly one element paint the fill, and let it be the item.** An
-  element's background covers its *border* box; an absolutely positioned child
-  covers its parent's *padding* box. Painting the base colour on both the item
-  and the mesh gives two rectangles of different sizes and a visible seam;
-  painting it only on the mesh gives one rectangle inset from every neighbouring
-  item, so its right edge does not line up with theirs. The item is the right
-  box, because that is the one GitHub's own hover fills use. The mesh carries no
-  background at all — only the blurred blobs, whose inset by the border width is
-  invisible. A test asserts that invariant against `content.css`, since nothing
-  in the markup reveals it.
+- **Measure the box; don't assume it.** An element's background covers its
+  *border* box. An absolutely positioned child can only reach its parent's
+  *padding* box. So a mesh at `inset: 0` is always short by the item's border,
+  which shows as a margin down one side — and no arrangement of CSS fixes it,
+  because the border widths belong to GitHub's stylesheet and are unknowable
+  until runtime. `fitMesh()` reads them with `getComputedStyle` once the entry
+  is in the document and pulls the mesh out over the border, so its box is the
+  item's background box exactly. `.gh-tldr-menu-item` therefore must *not* set
+  `overflow: hidden`, which would clip it straight back; the mesh clips itself.
+  The mesh is then the single painter — the item's hover rule suppresses the
+  host's fill and paints nothing — so there is one rectangle, over the same box
+  every neighbouring item fills. Tests assert both halves: one painter in
+  `content.css`, and a measured inset of `-2px` on a bordered fixture.
 - **Give each entry its own phase.** `content.js` sets a random negative
   `--gh-tldr-phase` per entry, which every animation in `content.css` takes as
   its `animation-delay`. A negative delay starts an animation part-way through

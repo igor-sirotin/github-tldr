@@ -22,7 +22,7 @@ const menuItem = (label, extraClass = '', icon = 'octicon-link') => `
 // on the inner content button while role="menuitem" sits on the li.
 const actionListItem = (label, extraClass = '') => `
       <li role="menuitem" class="prc-ActionList-ActionListItem-uq6I7">
-        <button type="button" class="prc-ActionList-ActionListContent-sg9-x ${extraClass}">
+        <button type="button" class="prc-ActionList-ActionListContent-sg9-x ${extraClass}" style="border: 2px solid transparent; position: relative">
           <span class="prc-ActionList-Visual-49ccF prc-ActionList-VisualWrap-rfjV5">
             <svg class="octicon octicon-quote" width="16" height="16" aria-hidden="true"><path d="M0 0"/></svg>
           </span>
@@ -112,15 +112,18 @@ const assert = (c, m) => { if (!c) { console.error('FAIL:', m); process.exitCode
 // own hover fills use.
 const css = fs.readFileSync(path.join(__dirname, '..', 'content.css'), 'utf8');
 const fills = css
+  .replace(/\/\*[\s\S]*?\*\//g, '')
   .split('}')
   .filter((block) => /background[^:]*:[^;]*--tldr-base/.test(block))
   .map((block) => block.split('{')[0].trim().split('\n').pop().trim());
 assert(fills.length === 1, `exactly one rule paints the base fill (got ${fills.length}: ${fills.join(' / ')})`);
-assert(/gh-tldr-menu-item/.test(fills[0]) && !/gh-tldr-mesh/.test(fills[0]),
-  `and it is the item, whose box matches the neighbouring items (got ${fills[0]})`);
-const meshRule = css.slice(css.indexOf('.gh-tldr-mesh {'), css.indexOf('}', css.indexOf('.gh-tldr-mesh {')));
-assert(!/background(-color)?\s*:/.test(meshRule),
-  'the mesh paints no rectangle of its own, only the blurred blobs it carries');
+assert(fills[0] === '.gh-tldr-mesh', `and it is the mesh (got ${fills[0]})`);
+const stripComments = (text) => text.replace(/\/\*[\s\S]*?\*\//g, '');
+const itemRule = stripComments(
+  css.slice(css.indexOf('.gh-tldr-menu-item {'), css.indexOf('}', css.indexOf('.gh-tldr-menu-item {')))
+);
+assert(!/overflow\s*:\s*hidden/.test(itemRule),
+  'the item does not clip, which would undo the mesh being pulled over the border');
 const entryIn = (root) => root.querySelector('.gh-tldr-entry');
 const actionable = (entry) => entry.querySelector('.gh-tldr-menu-item') || entry;
 const labelsIn = (menu) => [...menu.querySelectorAll('[role="menuitem"]')].map((el) => el.textContent.trim());
@@ -169,6 +172,8 @@ assert(new Set(phases).size > 1, `phases differ between entries (got ${phases.jo
 
 const mesh = actionable(entryA).querySelector('.gh-tldr-mesh');
 assert(mesh, 'hover mesh is built into the entry');
+assert(mesh.style.inset === '-0px -0px -0px -0px',
+  `no border on this item, so the mesh sits flush (got ${JSON.stringify(mesh.style.inset)})`);
 assert(mesh.querySelectorAll('.gh-tldr-blob').length === 7, 'mesh has the seven blobs the design animates');
 assert(mesh.getAttribute('aria-hidden') === 'true', 'mesh is decorative');
 assert(actionable(entryA).firstElementChild === mesh, 'mesh sits behind the icon and label');
@@ -281,6 +286,12 @@ assert(sent.filter((m) => m.type === 'peek').length === 5,
   assert(portalEntry.tagName === 'LI' && portalEntry.classList.contains('gh-tldr-entry'),
     'the li carries only the entry class, so it adds no second hover box');
   assert(!portalEntry.classList.contains('gh-tldr-menu-item'), 'and is not itself styled as the item');
+
+  // The measured fit: this item has a 2px border, so the mesh is pulled out
+  // over it and covers the same box the item's background does.
+  const portalMesh = portalEntry.querySelector('.gh-tldr-mesh');
+  assert(portalMesh.style.inset === '-2px -2px -2px -2px',
+    `mesh is fitted to the border box, not the padding box (got ${JSON.stringify(portalMesh.style.inset)})`);
 
   const portalWand = portalEntry.querySelector('svg.gh-tldr-wand');
   assert(portalWand.closest('[class*="prc-ActionList-Visual"]'), 'wand stays in the visual slot');

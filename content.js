@@ -334,6 +334,32 @@ function outerCell(item) {
   return cell;
 }
 
+// A border only counts when there is a border style; browsers compute the
+// width to 0 without one, but not every DOM implementation does.
+function borderWidth(cs, side) {
+  const style = cs.getPropertyValue(`border-${side}-style`);
+  if (!style || style === 'none' || style === 'hidden') return 0;
+  return parseFloat(cs.getPropertyValue(`border-${side}-width`)) || 0;
+}
+
+// The mesh is absolutely positioned, so `inset: 0` reaches only the item's
+// PADDING box — the border ring stays unpainted and shows as a margin down one
+// side, which is exactly what kept coming back. The item's own background, and
+// every neighbouring item's hover fill, cover the BORDER box instead. That
+// difference is not knowable in CSS, because the widths belong to GitHub's
+// stylesheet, so measure them here and pull the mesh out over the border.
+// `.gh-tldr-menu-item` deliberately does not set `overflow: hidden`, which
+// would clip this straight back to the padding box; the mesh clips itself.
+function fitMesh(item, mesh) {
+  const cs = getComputedStyle(item);
+  // The mesh is only positioned against the item if the item is positioned.
+  if (cs.position === 'static') item.style.position = 'relative';
+  const inset = ['top', 'right', 'bottom', 'left']
+    .map((side) => `-${borderWidth(cs, side)}px`)
+    .join(' ');
+  mesh.style.inset = inset;
+}
+
 function closeMenu(el) {
   const details = el.closest('details');
   if (details) {
@@ -504,6 +530,11 @@ function addMenuEntry(quote) {
   });
 
   cell.insertAdjacentElement('afterend', item);
+
+  // Only measurable once it is in the document.
+  const styled = item.querySelector('.' + MENU_ITEM_CLASS) || item;
+  const mesh = styled.querySelector('.gh-tldr-mesh');
+  if (mesh) fitMesh(styled, mesh);
 }
 
 // Menus are cheap to re-check and are re-rendered on every open, so this runs

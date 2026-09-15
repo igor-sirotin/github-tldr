@@ -10,7 +10,9 @@
 
 .gh-tldr-menu-item {
   position: relative;
-  overflow: hidden;
+  /* Deliberately no `overflow: hidden`. The mesh is pulled out over the item's
+     border by content.js so it covers the same box as the item's background,
+     and clipping here would undo exactly that. The mesh clips itself. */
 }
 
 /* ActionList paints its hover on the content element, which is inset from the
@@ -207,12 +209,11 @@
   pointer-events: none;
   opacity: 0;
   transition: opacity 140ms cubic-bezier(.2, .8, .2, 1);
-  /* No background of its own. The base colour belongs on the item, whose
-     background covers the BORDER box — the same box every other menu item
-     fills on hover. This element only covers the PADDING box, so a rectangle
-     painted here would sit inset from the host's own hover fills and its right
-     edge would not line up with them. The blobs it carries are blurred and
-     soft-edged, so their inset by the border width is invisible. */
+  /* The solid base under the blobs, and the one fill the entry paints. Its box
+     is made to match the item's background box by fitMesh() in content.js, so
+     this rectangle and the hover fills of the items around it share every
+     edge. */
+  background-color: var(--tldr-base);
 }
 
 /* Each blob's edge is a radial falloff in its OWN percentages, not a pixel
@@ -328,14 +329,12 @@
 .gh-tldr-menu-item:focus,
 .gh-tldr-menu-item:focus-visible,
 .gh-tldr-menu-item[aria-selected="true"] {
-  /* Exactly one element may paint this fill, and it has to be this one. An
-     element's background covers its BORDER box, which is the box every other
-     menu item fills on hover, so filling here lines up with them exactly. The
-     mesh can only cover the PADDING box, so a fill painted there would be
-     inset from its neighbours. Painting in both places gives two rectangles of
-     different sizes and a visible seam. */
+  /* Suppress the host's own hover fill and paint nothing here: the mesh is the
+     single painter, and fitMesh() has already sized it to this element's
+     background box. Painting here as well would be a second rectangle, and the
+     two are only guaranteed to agree while that measurement holds. */
   background-color: transparent !important;
-  background-image: linear-gradient(var(--tldr-base), var(--tldr-base)) !important;
+  background-image: none !important;
   outline: none;
 }
 
