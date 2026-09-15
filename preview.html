@@ -125,6 +125,20 @@
   .dropdown-item.danger:hover { background: var(--fgColor-danger); color: #fff; }
   .dropdown-divider { height: 1px; margin: 4px 0; background: var(--borderColor-default); }
 
+  .prc-ActionList-ActionList {
+    position: absolute; right: 0; top: 100%; z-index: 20; min-width: 200px;
+    display: block; padding: 4px; margin-top: 4px; list-style: none;
+    background: var(--bgColor-default); border: 1px solid var(--borderColor-default);
+    border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,.16); text-align: left;
+  }
+  .prc-ActionList-ActionListItem { display: block; border-radius: 6px; cursor: pointer; }
+  .prc-ActionList-ActionListContent {
+    display: grid; grid-template-columns: 16px 1fr; align-items: center; gap: 8px;
+    padding: 6px 8px; font: 400 14px/20px inherit; color: var(--fgColor-default);
+  }
+  .prc-ActionList-LeadingVisual svg { width: 16px; height: 16px; fill: currentColor; }
+  .prc-ActionList-ActionListItem:hover { background: var(--bgColor-accent-emphasis); color: #fff; }
+
   .states { padding: 16px; background: var(--bgColor-default); border: 1px solid var(--borderColor-default); border-radius: 6px; }
   .states .label { display: block; font: 500 11px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--fgColor-muted); margin-bottom: 12px; }
   .states .open-menu { position: static; box-shadow: none; margin: 0; }
@@ -280,7 +294,7 @@
         <strong>octocat</strong> opened this issue · Issue description (React view)
         <div class="IssueBodyHeader-module__badgesSection__demo" style="display:flex;align-items:center;gap:8px;margin-left:auto">
           <div class="IssueBodyHeader-module__badgeGroup__demo"><span class="Label">Collaborator</span></div>
-          <div class="IssueBodyHeader-module__actionsSection__demo tldr-menu-slot"></div>
+          <div class="IssueBodyHeader-module__actionsSection__demo tldr-menu-slot" data-menu="primer"></div>
         </div>
       </div>
     </div>
@@ -312,15 +326,45 @@
   </details>
 </template>
 
+
+<template id="menu-template-primer">
+  <details class="tldr-menu"><summary title="Show options">···</summary>
+    <div class="prc-ActionList-ActionList" role="menu">
+      <li role="menuitem" class="prc-ActionList-ActionListItem">
+        <div class="prc-ActionList-ActionListContent">
+          <span class="prc-ActionList-LeadingVisual"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M7.775 3.275a.75.75 0 0 0 1.06 1.06l1.25-1.25a2 2 0 1 1 2.83 2.83l-2.5 2.5a2 2 0 0 1-2.83 0 .75.75 0 0 0-1.06 1.06 3.5 3.5 0 0 0 4.95 0l2.5-2.5a3.5 3.5 0 0 0-4.95-4.95l-1.25 1.25Z"/></svg></span>
+          <span class="prc-ActionList-ItemLabel">Copy link</span>
+        </div>
+      </li>
+      <li role="menuitem" class="prc-ActionList-ActionListItem js-comment-quote-reply">
+        <div class="prc-ActionList-ActionListContent">
+          <span class="prc-ActionList-LeadingVisual"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.75 2.5h12.5a.25.25 0 0 1 .25.25v8.5a.25.25 0 0 1-.25.25H8.061a.75.75 0 0 0-.53.22L5 14.311V11.75a.75.75 0 0 0-.75-.75H1.75a.25.25 0 0 1-.25-.25v-8.5a.25.25 0 0 1 .25-.25Z"/></svg></span>
+          <span class="prc-ActionList-ItemLabel">Quote reply</span>
+        </div>
+      </li>
+      <div class="dropdown-divider"></div>
+      <li role="menuitem" class="prc-ActionList-ActionListItem">
+        <div class="prc-ActionList-ActionListContent">
+          <span class="prc-ActionList-LeadingVisual"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11.013 1.427a1.75 1.75 0 0 1 2.474 0l1.086 1.086a1.75 1.75 0 0 1 0 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a1.125 1.125 0 0 1-1.392-1.392l.93-3.25c.081-.286.235-.547.445-.758l8.61-8.61Z"/></svg></span>
+          <span class="prc-ActionList-ItemLabel">Edit</span>
+        </div>
+      </li>
+    </div>
+  </details>
+</template>
+
 <script>
   // Fill every menu slot from the template before content.js runs.
   const tpl = document.getElementById('menu-template');
+  const tplPrimer = document.getElementById('menu-template-primer');
   for (const slot of document.querySelectorAll('.tldr-menu-slot')) {
-    const menu = tpl.content.firstElementChild.cloneNode(true);
+    // The React issue view renders Primer's ActionList, not a details-menu.
+    const source = slot.dataset.menu === 'primer' ? tplPrimer : tpl;
+    const menu = source.content.firstElementChild.cloneNode(true);
     if (slot.dataset.open === '1') {
       menu.open = true;
       menu.querySelector('summary').hidden = true;
-      menu.querySelector('.dropdown-menu').classList.add('open-menu');
+      menu.querySelector('.dropdown-menu, .prc-ActionList-ActionList').classList.add('open-menu');
     }
     slot.appendChild(menu);
   }

@@ -16,7 +16,6 @@
   height: 16px;
   flex: none;
   vertical-align: text-bottom;
-  margin-right: 8px;
   /* Stroked with the same four hues as the label, along the wand's diagonal.
      SVG cannot take a CSS gradient as `stroke`, so content.js injects one
      hidden <svg> paint server and the stop colours are set here. */
@@ -154,6 +153,13 @@
 .gh-tldr-menu-item .gh-tldr-wand {
   position: relative;
   z-index: 1;
+}
+
+/* Gap after the glyph, but only where the glyph is a direct child and nothing
+   else is spacing it. Primer's ActionList puts it in a leading-visual slot
+   that already has its own gap, and adding to that pushes the label right. */
+.gh-tldr-menu-item > .gh-tldr-wand {
+  margin-right: 8px;
 }
 
 /* Hover fill: an animated mesh gradient. Seven colour blobs are real elements

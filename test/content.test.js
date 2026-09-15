@@ -143,6 +143,11 @@ const wand = entryA.querySelector('svg');
 assert(wand && wand.classList.contains('gh-tldr-wand'), 'entry carries the wand glyph');
 assert(wand.classList.contains('octicon'), "it keeps GitHub's octicon class so it is sized and spaced natively");
 assert(wand.closest('.gh-tldr-menu-item'), 'wand is inside the styled item, so the gradient stroke rule matches');
+assert(wand.parentElement === actionable(entryA),
+  'classic menu: the wand is a direct child, so it does get the 8px gap');
+const classicLabel = entryA.querySelector('.gh-tldr-label');
+assert(classicLabel.tagName === 'SPAN' && classicLabel.parentElement === actionable(entryA),
+  'classic menu: a bare text label is replaced by our own span, at the same level');
 assert(!wand.classList.contains('octicon-quote'), "but not the original glyph's specific class");
 assert(wand.getAttribute('width') === '16' && wand.getAttribute('height') === '16', 'icon keeps the real item dimensions');
 assert(wand.querySelectorAll('path').length === 8, 'and is the full lucide wand, not the cloned path');
@@ -207,8 +212,18 @@ assert(sent.filter((m) => m.type === 'peek').length === 5,
   const issueBody = doc.querySelector('[data-testid="markdown-body"]');
   const portal = doc.createElement('div');
   portal.innerHTML = `<div role="menu" id="portal-menu">
-    <button role="menuitem" class="prc-ActionList-ActionListContent">Copy link</button>
-    <button role="menuitem" class="prc-ActionList-ActionListContent js-comment-quote-reply"><svg></svg>Quote reply</button>
+    <li role="menuitem" class="prc-ActionList-ActionListItem">
+      <div class="prc-ActionList-ActionListContent">
+        <span class="prc-ActionList-LeadingVisual"><svg class="octicon" width="16" height="16"></svg></span>
+        <span class="prc-ActionList-ItemLabel">Copy link</span>
+      </div>
+    </li>
+    <li role="menuitem" class="prc-ActionList-ActionListItem js-comment-quote-reply">
+      <div class="prc-ActionList-ActionListContent">
+        <span class="prc-ActionList-LeadingVisual"><svg class="octicon" width="16" height="16"></svg></span>
+        <span class="prc-ActionList-ItemLabel">Quote reply</span>
+      </div>
+    </li>
   </div>`;
   doc.getElementById('issue-kebab').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
   doc.body.appendChild(portal); // Primer renders the menu at the end of the document
@@ -218,6 +233,20 @@ assert(sent.filter((m) => m.type === 'peek').length === 5,
   assert(portalEntry, 'portalled menu gets an entry too');
   assert(portalEntry.previousElementSibling === portal.querySelector('.js-comment-quote-reply'), 'entry follows Quote reply in the portalled menu');
   assert(portalEntry.querySelector('svg.gh-tldr-wand'), 'icon is included, because this menu uses icons');
+
+  // Primer nests the glyph in a slot that already spaces it; an extra margin
+  // there is what pushed the label right in the React issue view.
+  const portalItem = actionable(portalEntry);
+  const portalWand = portalEntry.querySelector('svg.gh-tldr-wand');
+  assert(portalWand.parentElement !== portalItem,
+    'slot layout: the wand is not a direct child, so the margin rule must not match it');
+  assert(portalWand.closest('.prc-ActionList-LeadingVisual'), 'wand stays in the leading-visual slot');
+
+  const portalLabel = portalEntry.querySelector('.gh-tldr-label');
+  assert(portalLabel.classList.contains('prc-ActionList-ItemLabel'),
+    "the label is GitHub's own label element, re-used rather than wrapped in another span");
+  assert(portalLabel.children.length === 0 && portalLabel.textContent === 'TLDR',
+    'no extra element is nested inside the label');
 
   actionable(portalEntry).dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
   await new Promise((r) => setTimeout(r, 30));

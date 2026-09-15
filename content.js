@@ -198,12 +198,18 @@ function wrapLabel(root, text) {
 
   const first = nodes[0];
   const holder = first.parentElement;
+
+  // Where GitHub already has an element around the label (Primer's ItemLabel),
+  // paint that one instead of nesting another span inside it: an extra element
+  // inside a flex or grid slot becomes visible spacing.
   if (holder !== root && holder.childNodes.length === 1) {
-    holder.textContent = '';
-    holder.appendChild(label);
-  } else {
-    first.replaceWith(label);
+    holder.classList.add('gh-tldr-label');
+    holder.textContent = text;
+    for (const extra of nodes.slice(1)) extra.nodeValue = '';
+    return holder;
   }
+
+  first.replaceWith(label);
   for (const extra of nodes.slice(1)) extra.nodeValue = '';
   return label;
 }

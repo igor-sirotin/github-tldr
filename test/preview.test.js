@@ -13,7 +13,20 @@ JSDOM.fromURL(file, { runScripts: 'dangerously', resources: 'usable', pretendToB
     const click = (el) => el.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
 
     const menus = doc.querySelectorAll('details-menu');
-    assert(menus.length === 8, `every mock comment has a menu, plus the always-open demo (got ${menus.length})`);
+    assert(menus.length === 7, `classic menus: one per comment plus the always-open demo (got ${menus.length})`);
+
+    // The React issue view renders Primer's slot layout, where the glyph has its
+    // own gap — the shape that showed a stray margin as padding on the label.
+    const primer = doc.querySelector('.prc-ActionList-ActionList');
+    assert(primer, 'the issue-view mock uses a Primer ActionList');
+    const primerEntry = primer.querySelector('.gh-tldr-entry');
+    assert(primerEntry, 'Primer menu gets an entry too');
+    const primerWand = primerEntry.querySelector('.gh-tldr-wand');
+    assert(primerWand.closest('.prc-ActionList-LeadingVisual'), 'wand sits in the leading-visual slot');
+    assert(primerWand.parentElement !== primerEntry.querySelector('.gh-tldr-menu-item'),
+      'wand is not a direct child there, so it takes no extra margin');
+    assert(primerEntry.querySelector('.gh-tldr-label').classList.contains('prc-ActionList-ItemLabel'),
+      "Primer's own label element is re-used rather than wrapped");
     assert(doc.querySelectorAll('.gh-tldr-entry').length === 8, 'every menu gets a TLDR entry');
     assert(doc.querySelectorAll('.gh-tldr-btn').length === 0, 'no injected buttons remain in the preview');
 
