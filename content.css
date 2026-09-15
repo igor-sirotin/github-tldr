@@ -1,88 +1,397 @@
-/* GitHub TLDR — button + summary panel */
+/* GitHub TLDR — ... menu entry + summary panel */
 
-.gh-tldr-btn {
-  --gh-tldr-surface: var(--bgColor-default, #ffffff);
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  justify-content: center;
-  font: 600 12px/20px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-  letter-spacing: 0.02em;
-  color: var(--fgColor-muted, #656d76);
-  border: 1px solid transparent;
-  border-radius: 6px;
-  padding: 2px 9px;
+/* The entry is cloned from the neighbouring menu item — same tag, same wrapper
+   chain, same classes — so GitHub styles it: height, padding, font, icon gap
+   and hover geometry all come from whichever menu it joined. Everything below
+   only re-colours it, the way Delete re-colours its own foreground.
+   `data-tldr-menu` records which of the two implementations it landed in
+   (see makeMenuItem in content.js); the mesh needs no per-variant geometry
+   because it inherits the host's radius and box. */
+
+.gh-tldr-menu-item {
+  position: relative;
+  /* Deliberately no `overflow: hidden`. The mesh is pulled out over the item's
+     border by content.js so it covers the same box as the item's background,
+     and clipping here would undo exactly that. The mesh clips itself. */
+}
+
+/* ActionList paints its hover on the content element, which is inset from the
+   li and rounded; the mesh must not spill past that box. */
+.gh-tldr-menu-item[data-tldr-menu="actionlist"] {
+  border-radius: var(--borderRadius-medium, 6px);
+}
+
+/* The legacy item's hover is a full-width square row, so the mesh is too. */
+.gh-tldr-menu-item[data-tldr-menu="dropdown"] {
+  border-radius: 0;
+}
+
+/* ActionList's content element owns the gap between the visual slot and the
+   label, so the icon must not add its own margin on top of it. */
+.gh-tldr-menu-item[data-tldr-menu="actionlist"] .gh-tldr-wand {
+  margin-right: 0;
+}
+
+/* The li we cloned carries ActionList's own list geometry; it must not add a
+   second hover box of its own. */
+.gh-tldr-entry {
+  background: none;
+}
+
+/* Icon: same 16px box and currentColor GitHub gives menu-item octicons. */
+.gh-tldr-menu-item .gh-tldr-wand {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  vertical-align: text-bottom;
   margin-right: 8px;
-  cursor: pointer;
-  vertical-align: middle;
-  align-self: center;
-  line-height: 20px;
-  box-sizing: border-box;
-  background:
-    linear-gradient(var(--gh-tldr-surface), var(--gh-tldr-surface)) padding-box,
-    linear-gradient(
-      90deg,
-      #0969da, #8250df, #bf3989, #bc4c00, #1a7f37, #0969da
-    ) border-box;
-  background-size: auto, 300% 100%;
-  background-position: 0 0, 0 50%;
-  animation: gh-tldr-sheen 35s linear infinite;
-  transition: color 140ms cubic-bezier(.2,.8,.2,1);
+  /* Stroked with the same four hues as the label, along the wand's diagonal.
+     SVG cannot take a CSS gradient as `stroke`, so content.js injects one
+     hidden <svg> paint server and the stop colours are set here. */
+  stroke: url(#gh-tldr-icon-gradient);
+  /* Octicons are filled shapes and GitHub's menu CSS sets fill on any svg in
+     a menu item; this one is a stroked Lucide glyph and must stay unfilled. */
+  fill: none;
 }
 
-@keyframes gh-tldr-sheen {
-  to { background-position: 0 0, -200% 50%; }
+.gh-tldr-stop-1 { stop-color: var(--tldr-1); }
+.gh-tldr-stop-2 { stop-color: var(--tldr-2); }
+.gh-tldr-stop-3 { stop-color: var(--tldr-3); }
+.gh-tldr-stop-4 { stop-color: var(--tldr-4); }
+
+/* Hovered in the legacy menu, the fill carries the colour and the icon goes
+   white with the text, so it drops back to currentColor. ActionList is left
+   alone: its own items keep their foreground on hover. */
+.gh-tldr-menu-item[data-tldr-menu="dropdown"]:hover .gh-tldr-wand,
+.gh-tldr-menu-item[data-tldr-menu="dropdown"]:focus .gh-tldr-wand,
+.gh-tldr-menu-item[data-tldr-menu="dropdown"]:focus-visible .gh-tldr-wand,
+.gh-tldr-menu-item[data-tldr-menu="dropdown"][aria-selected="true"] .gh-tldr-wand {
+  stroke: currentColor;
 }
 
-.gh-tldr-btn:hover:not(:disabled) {
-  --gh-tldr-surface: var(--bgColor-neutral-muted, #f6f8fa);
-  color: var(--fgColor-default, #1f2328);
-  animation-duration: 11s;
+/* Two colour roles. `--tldr-f*` are the hover mesh's seven points plus its
+   base — the supplied palette, used as given in both themes. `--tldr-*` are
+   the resting label's four hues: the same families, darkened for light
+   backgrounds and lightened for dark ones, because the palette itself is too
+   pale to read as 13px text on white. */
+.gh-tldr-menu-item,
+#gh-tldr-icon-gradient {
+  --tldr-base: #ffc599;
+  --tldr-f1: hsl(354, 94%, 60%);
+  --tldr-f2: hsl(328, 91%, 70%);
+  --tldr-f3: hsl(159, 94%, 63%);
+  --tldr-f4: hsl(35, 61%, 69%);
+  --tldr-f5: hsl(167, 84%, 78%);
+  --tldr-f6: hsl(315, 82%, 73%);
+  --tldr-f7: hsl(146, 94%, 62%);
+
+  --tldr-1: hsl(354, 72%, 44%);
+  --tldr-2: hsl(328, 72%, 40%);
+  --tldr-3: hsl(159, 72%, 28%);
+  --tldr-4: hsl(35, 72%, 33%);
 }
 
-.gh-tldr-btn:active:not(:disabled) {
+/* Dark theme. Resting label: the same four families lightened — the
+   light-theme set would be too dim on #0d1117. Mesh: the same seven hues
+   deepened, since the pastel set glares against a dark menu. */
+@media (prefers-color-scheme: dark) {
+  .gh-tldr-menu-item,
+  #gh-tldr-icon-gradient {
+    --tldr-base: hsl(25, 40%, 22%);
+    --tldr-f1: hsl(354, 62%, 40%);
+    --tldr-f2: hsl(328, 55%, 40%);
+    --tldr-f3: hsl(159, 60%, 27%);
+    --tldr-f4: hsl(35, 45%, 33%);
+    --tldr-f5: hsl(167, 48%, 30%);
+    --tldr-f6: hsl(315, 50%, 38%);
+    --tldr-f7: hsl(146, 58%, 26%);
+    --tldr-1: hsl(354, 94%, 74%);
+    --tldr-2: hsl(328, 91%, 78%);
+    --tldr-3: hsl(159, 84%, 62%);
+    --tldr-4: hsl(35, 90%, 68%);
+  }
+}
+
+/* Explicit dark opt-in. `data-dark-theme` is deliberately not matched: GitHub
+   sets it on every page, light or not, to name which theme dark would use. */
+[data-color-mode="dark"] .gh-tldr-menu-item,
+[data-color-mode="dark"] #gh-tldr-icon-gradient,
+[data-preview-theme="dark"] .gh-tldr-menu-item,
+[data-preview-theme="dark"] #gh-tldr-icon-gradient {
+  --tldr-base: hsl(25, 40%, 22%);
+  --tldr-f1: hsl(354, 62%, 40%);
+  --tldr-f2: hsl(328, 55%, 40%);
+  --tldr-f3: hsl(159, 60%, 27%);
+  --tldr-f4: hsl(35, 45%, 33%);
+  --tldr-f5: hsl(167, 48%, 30%);
+  --tldr-f6: hsl(315, 50%, 38%);
+  --tldr-f7: hsl(146, 58%, 26%);
+  --tldr-1: hsl(354, 94%, 74%);
+  --tldr-2: hsl(328, 91%, 78%);
+  --tldr-3: hsl(159, 84%, 62%);
+  --tldr-4: hsl(35, 90%, 68%);
+}
+
+/* GitHub sets data-color-mode="light" explicitly when the user opts out. */
+[data-color-mode="light"] .gh-tldr-menu-item,
+[data-color-mode="light"] #gh-tldr-icon-gradient,
+[data-preview-theme="light"] .gh-tldr-menu-item,
+[data-preview-theme="light"] #gh-tldr-icon-gradient {
+  --tldr-base: #ffc599;
+  --tldr-f1: hsl(354, 94%, 60%);
+  --tldr-f2: hsl(328, 91%, 70%);
+  --tldr-f3: hsl(159, 94%, 63%);
+  --tldr-f4: hsl(35, 61%, 69%);
+  --tldr-f5: hsl(167, 84%, 78%);
+  --tldr-f6: hsl(315, 82%, 73%);
+  --tldr-f7: hsl(146, 94%, 62%);
+  --tldr-1: hsl(354, 72%, 44%);
+  --tldr-2: hsl(328, 72%, 40%);
+  --tldr-3: hsl(159, 72%, 28%);
+  --tldr-4: hsl(35, 72%, 33%);
+}
+
+/* Label at rest: a wide multi-hue ramp travelling through the glyphs. A strip
+   of text 35px wide cannot show a 2D mesh, so the resting state is the linear
+   version and the mesh is kept for the fill, which has room for it. Guarded,
+   so a browser without background-clip:text keeps ordinary menu-item text. */
+.gh-tldr-menu-item .gh-tldr-label {
+  position: relative;
+  z-index: 1;
+  background-image: linear-gradient(
+    90deg,
+    var(--tldr-1), var(--tldr-2), var(--tldr-3), var(--tldr-4),
+    var(--tldr-3), var(--tldr-2), var(--tldr-1)
+  );
+  background-size: 300% 100%;
+}
+
+@supports ((background-clip: text) or (-webkit-background-clip: text)) {
+  .gh-tldr-menu-item .gh-tldr-label {
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: gh-tldr-ramp 8s linear var(--gh-tldr-phase, 0s) infinite;
+  }
+}
+
+/* 300% size repeats every -150%, so two tiles land exactly on the start. */
+@keyframes gh-tldr-ramp {
+  to { background-position: -300% 50%; }
+}
+
+.gh-tldr-menu-item .gh-tldr-wand {
+  position: relative;
+  z-index: 1;
+}
+
+/* Hover fill: an animated mesh gradient. Seven colour blobs are real elements
+   (built by content.js), each a blurred circle on its own path at its own
+   duration, inside a clipping frame over an opaque base.
+   Blobs rather than layered radial-gradients: a gradient's soft edge is a
+   colour ramp in one tile, so overlapping seven of them in a 28px strip means
+   fighting tile arithmetic, and any shared keyframe timeline eventually
+   collapses them onto one point. Separate elements interpolate `transform`,
+   which is cheap, continuous and independent per blob, and a real `blur()`
+   melts the overlaps into one another the way a mesh gradient should. */
+/* GitHub spaces an item's children with rules that target every direct child,
+   e.g.
+     .ActionListContent > :not(:last-child, .Spacer) { margin-right: .5rem }
+   The mesh is a direct child too, so it was picking that up — and on an
+   absolutely positioned box with both `left` and `right` set, a right margin
+   reduces the used width rather than being ignored. That is the gap down the
+   right of the fill, and no amount of adjusting `inset` fixes it because the
+   box is being shrunk after the offsets resolve.
+
+   The mesh is a decorative overlay and must take no part in the item's layout,
+   so anything the host could use to space or place a child is neutralised.
+   `!important` is needed because those rules are more specific than a single
+   class, and the host's own children must keep their spacing — only this one
+   opts out. `grid-area` is included deliberately: a host rule assigning one
+   would change the mesh's containing block to a single grid cell. */
+.gh-tldr-mesh {
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  grid-area: auto !important;
+  flex: none !important;
+  float: none !important;
+  position: absolute;
+  inset: 0;
+  /* No `grid-area`. ActionList's content element is a grid, and giving an
+     absolutely positioned child a definite grid position makes its containing
+     block that grid AREA — which sits inside the element's padding. The mesh
+     then paints a smaller rectangle inset from the hover fill behind it, and
+     you see two boxes. With no grid position the containing block is the
+     padding box, so the mesh covers the fill exactly. */
+  z-index: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 140ms cubic-bezier(.2, .8, .2, 1);
+  /* The solid base under the blobs, and the one fill the entry paints. Its box
+     is made to match the item's background box by fitMesh() in content.js, so
+     this rectangle and the hover fills of the items around it share every
+     edge. */
+  background-color: var(--tldr-base);
+}
+
+/* Each blob's edge is a radial falloff in its OWN percentages, not a pixel
+   blur: a fixed `blur()` is a constant number of pixels, so it softens a 92px
+   blob on a real menu item but leaves a visible disc arc on a large one. This
+   way the softness is identical at any size, and the preview's magnified demo
+   is a true picture of the 28px original. The small blur on top only removes
+   banding. `will-change` keeps the seven independent animations on the
+   compositor. */
+.gh-tldr-blob {
+  position: absolute;
+  top: 50%;
+  width: 60%;
+  aspect-ratio: 1;
+  margin: -30% 0 0 -30%;
+  filter: blur(6px);
+  will-change: transform;
+}
+
+.gh-tldr-blob:nth-child(1) {
+  left: 7%;
+  background: radial-gradient(circle closest-side, var(--tldr-f1) 0%, var(--tldr-f1) 22%, transparent 78%);
+  animation: gh-tldr-blob-1 9s ease-in-out var(--gh-tldr-phase, 0s) infinite alternate;
+}
+
+.gh-tldr-blob:nth-child(2) {
+  left: 16%;
+  background: radial-gradient(circle closest-side, var(--tldr-f2) 0%, var(--tldr-f2) 22%, transparent 78%);
+  animation: gh-tldr-blob-2 13s ease-in-out var(--gh-tldr-phase, 0s) infinite alternate;
+}
+
+.gh-tldr-blob:nth-child(3) {
+  left: 26%;
+  background: radial-gradient(circle closest-side, var(--tldr-f3) 0%, var(--tldr-f3) 22%, transparent 78%);
+  animation: gh-tldr-blob-3 11s ease-in-out var(--gh-tldr-phase, 0s) infinite alternate;
+}
+
+.gh-tldr-blob:nth-child(4) {
+  left: 38%;
+  background: radial-gradient(circle closest-side, var(--tldr-f4) 0%, var(--tldr-f4) 22%, transparent 78%);
+  animation: gh-tldr-blob-4 15s ease-in-out var(--gh-tldr-phase, 0s) infinite alternate;
+}
+
+.gh-tldr-blob:nth-child(5) {
+  left: 56%;
+  background: radial-gradient(circle closest-side, var(--tldr-f5) 0%, var(--tldr-f5) 22%, transparent 78%);
+  animation: gh-tldr-blob-5 10s ease-in-out var(--gh-tldr-phase, 0s) infinite alternate;
+}
+
+.gh-tldr-blob:nth-child(6) {
+  left: 74%;
+  background: radial-gradient(circle closest-side, var(--tldr-f6) 0%, var(--tldr-f6) 22%, transparent 78%);
+  animation: gh-tldr-blob-6 14s ease-in-out var(--gh-tldr-phase, 0s) infinite alternate;
+}
+
+.gh-tldr-blob:nth-child(7) {
+  left: 94%;
+  background: radial-gradient(circle closest-side, var(--tldr-f7) 0%, var(--tldr-f7) 22%, transparent 78%);
+  animation: gh-tldr-blob-7 12s ease-in-out var(--gh-tldr-phase, 0s) infinite alternate;
+}
+
+/* Every animation above takes `--gh-tldr-phase`, a negative delay content.js
+   sets per entry, which starts it part-way through its cycle. Without it every
+   TLDR entry on a page would run in lockstep, which reads as a single synced
+   pulse rather than as each item having a life of its own. A negative delay on
+   an infinite animation simply wraps, so one random range covers the label's 8s
+   ramp and the blobs' 9-15s drifts alike. */
+
+/* Paths are in percentages of the blob, so they scale with the item. Each
+   duration is different, so the seven points keep recombining and never line
+   up on a shared phase. */
+@keyframes gh-tldr-blob-1 {
+  50%  { transform: translate(56%, -28%) scale(1.15); }
+  100% { transform: translate(22%, 26%) scale(0.95); }
+}
+
+@keyframes gh-tldr-blob-2 {
+  50%  { transform: translate(-44%, 28%) scale(1.1); }
+  100% { transform: translate(36%, -24%) scale(1.2); }
+}
+
+@keyframes gh-tldr-blob-3 {
+  50%  { transform: translate(46%, 26%) scale(1.2); }
+  100% { transform: translate(-28%, -28%) scale(1); }
+}
+
+@keyframes gh-tldr-blob-4 {
+  50%  { transform: translate(-38%, -26%) scale(0.95); }
+  100% { transform: translate(-60%, 24%) scale(1.15); }
+}
+
+@keyframes gh-tldr-blob-5 {
+  50%  { transform: translate(34%, 30%) scale(1.1); }
+  100% { transform: translate(-42%, -22%) scale(1.2); }
+}
+
+@keyframes gh-tldr-blob-6 {
+  50%  { transform: translate(-52%, 22%) scale(1.15); }
+  100% { transform: translate(28%, -30%) scale(0.95); }
+}
+
+@keyframes gh-tldr-blob-7 {
+  50%  { transform: translate(-30%, -30%) scale(1.2); }
+  100% { transform: translate(-58%, 26%) scale(1.1); }
+}
+
+/* Hover: the drifting mesh replaces whatever fill the host menu would paint.
+   Foreground follows the host's convention — the legacy item flips its text
+   and icon to white with its accent fill, so this one does too; ActionList
+   items keep their foreground on a neutral hover, so the gradient label and
+   icon are left in place there. */
+.gh-tldr-menu-item:hover,
+.gh-tldr-menu-item:focus,
+.gh-tldr-menu-item:focus-visible,
+.gh-tldr-menu-item[aria-selected="true"] {
+  /* Suppress the host's own hover fill and paint nothing here: the mesh is the
+     single painter, and fitMesh() has already sized it to this element's
+     background box. Painting here as well would be a second rectangle, and the
+     two are only guaranteed to agree while that measurement holds. */
+  background-color: transparent !important;
+  background-image: none !important;
+  outline: none;
+}
+
+.gh-tldr-menu-item[data-tldr-menu="dropdown"]:hover,
+.gh-tldr-menu-item[data-tldr-menu="dropdown"]:focus,
+.gh-tldr-menu-item[data-tldr-menu="dropdown"]:focus-visible,
+.gh-tldr-menu-item[data-tldr-menu="dropdown"][aria-selected="true"] {
+  color: #ffffff !important;
+}
+
+.gh-tldr-menu-item:hover .gh-tldr-mesh,
+.gh-tldr-menu-item:focus .gh-tldr-mesh,
+.gh-tldr-menu-item:focus-visible .gh-tldr-mesh,
+.gh-tldr-menu-item[aria-selected="true"] .gh-tldr-mesh {
+  opacity: 1;
+}
+
+.gh-tldr-menu-item[data-tldr-menu="dropdown"]:hover .gh-tldr-label,
+.gh-tldr-menu-item[data-tldr-menu="dropdown"]:focus .gh-tldr-label,
+.gh-tldr-menu-item[data-tldr-menu="dropdown"]:focus-visible .gh-tldr-label,
+.gh-tldr-menu-item[data-tldr-menu="dropdown"][aria-selected="true"] .gh-tldr-label {
+  background-image: none;
+  color: #ffffff;
+  -webkit-text-fill-color: #ffffff;
+  animation: none;
+}
+
+.gh-tldr-menu-item:active {
   transform: translateY(1px);
 }
 
-.gh-tldr-btn:focus-visible {
-  outline: 2px solid var(--fgColor-accent, #0969da);
-  outline-offset: 2px;
-}
-
-.gh-tldr-btn:disabled {
-  cursor: default;
-}
-
-.gh-tldr-btn .gh-tldr-wand {
-  width: 14px;
-  height: 14px;
-  flex: none;
-  display: block; /* kills the inline baseline gap under the glyph */
-}
-
-.gh-tldr-btn.is-loading {
-  color: var(--fgColor-muted, #656d76);
-  animation-duration: 7s;
-}
-
-.gh-tldr-btn.is-loading .gh-tldr-wand {
-  animation: gh-tldr-wave 1s ease-in-out infinite;
-  transform-origin: 30% 70%;
-}
-
-@keyframes gh-tldr-wave {
-  0%, 100% { transform: rotate(-12deg); }
-  50%      { transform: rotate(12deg); }
-}
-
-/* Placement only, no visual change: the React issue header is a flex row with
-   no action bar, so push the button to the trailing edge where controls sit. */
-.gh-tldr-btn--header {
-  margin-left: auto;
-}
-
-.gh-tldr-bar {
-  padding: 6px 16px 0;
+@media (prefers-reduced-motion: reduce) {
+  .gh-tldr-menu-item .gh-tldr-label,
+  .gh-tldr-blob {
+    animation: none;
+  }
 }
 
 /* Panel */
@@ -104,11 +413,10 @@
   position: absolute;
   inset: 0 0 auto;
   height: 2px;
-  background: linear-gradient(
-    90deg,
-    #0969da, #8250df, #bf3989, #bc4c00, #1a7f37
-  );
+  background: linear-gradient(90deg, hsl(354, 94%, 60%), hsl(328, 91%, 70%), hsl(35, 61%, 69%), hsl(159, 94%, 63%), hsl(167, 84%, 78%));
 }
+
+/* The palette reads on either surface, so the hairline needs no theme split. */
 
 .gh-tldr-title {
   font: 500 11px/1 ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
@@ -160,11 +468,4 @@
 
 .gh-tldr-error::before {
   background: var(--fgColor-danger, #cf222e);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .gh-tldr-btn,
-  .gh-tldr-btn.is-loading .gh-tldr-wand {
-    animation: none;
-  }
 }

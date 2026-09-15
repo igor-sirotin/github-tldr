@@ -2,7 +2,7 @@
 <html lang="en" data-preview-theme="light">
 <head>
 <meta charset="utf-8">
-<title>GitHub TLDR — button preview</title>
+<title>GitHub TLDR — menu entry preview</title>
 <!-- The real extension stylesheet. Nothing here is loaded by the extension itself. -->
 <link rel="stylesheet" href="content.css">
 <style>
@@ -15,6 +15,7 @@
     --fgColor-muted: #59636e;
     --fgColor-accent: #0969da;
     --fgColor-danger: #cf222e;
+    --bgColor-accent-emphasis: #0969da;
   }
   [data-preview-theme="dark"] {
     --bgColor-default: #0d1117;
@@ -25,6 +26,7 @@
     --fgColor-muted: #9198a1;
     --fgColor-accent: #4493f8;
     --fgColor-danger: #f85149;
+    --bgColor-accent-emphasis: #1f6feb;
     color-scheme: dark;
   }
   body {
@@ -77,6 +79,7 @@
     border: 1px solid var(--borderColor-default); border-radius: 999px;
     color: var(--fgColor-muted);
   }
+  [hidden] { display: none !important; }
   .js-comment-body { padding: 16px; display: grid; gap: 12px; }
   .js-comment-body p { margin: 0; }
   .js-comment-body code {
@@ -97,8 +100,75 @@
   [data-testid="issue-body-viewer"] { padding: 16px; display: grid; gap: 12px; }
   [data-testid="issue-body-viewer"] p { margin: 0; }
 
-  .states { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; padding: 16px; background: var(--bgColor-default); border: 1px solid var(--borderColor-default); border-radius: 6px; }
-  .states .label { font: 500 11px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--fgColor-muted); width: 100%; }
+  /* Classic details-menu, close to GitHub's own metrics: 8px/12px padding,
+     16px leading octicon, 8px gap, accent fill on hover. */
+  .tldr-menu { position: relative; display: inline-block; }
+  .tldr-menu > summary { list-style: none; cursor: pointer; padding: 0 6px; border-radius: 6px; color: var(--fgColor-muted); }
+  .tldr-menu > summary::-webkit-details-marker { display: none; }
+  .tldr-menu > summary:hover { background: var(--bgColor-neutral-muted); color: var(--fgColor-default); }
+  .dropdown-menu {
+    position: absolute; right: 0; top: 100%; z-index: 20; min-width: 200px;
+    display: block; padding: 0; margin-top: 4px;
+    background: var(--bgColor-default); border: 1px solid var(--borderColor-default);
+    border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,.16); text-align: left;
+  }
+  /* Legacy items are full-width square rows — no radius, no menu padding. */
+  .dropdown-item {
+    display: flex; align-items: center; width: 100%; padding: 6px 12px; border: 0;
+    border-radius: 0; background: none;
+    font: 400 14px/20px inherit; color: var(--fgColor-default); text-align: left;
+    cursor: pointer; white-space: nowrap;
+  }
+  /* The legacy comment menu carries no icons, which is why the entry adds none
+     there either — see makeMenuItem's icon-suppression branch. */
+  .dropdown-item:hover { background: var(--bgColor-accent-emphasis); color: #fff; }
+  .dropdown-item.danger { color: var(--fgColor-danger); }
+  .dropdown-item.danger:hover { background: var(--fgColor-danger); color: #fff; }
+  .dropdown-divider { height: 1px; margin: 4px 0; background: var(--borderColor-default); }
+
+  /* The ActionList menu keeps its own 8px padding; the legacy one has none. */
+  .dropdown-menu.ActionList { padding: 8px; }
+
+  /* Primer ActionList: the li is a list row, the .ActionList-content inside it
+     is the padded, rounded box that takes the hover. */
+  .ActionList { list-style: none; margin: 0; padding: 8px; display: grid; gap: 2px; }
+  .ActionList-item { margin: 0; }
+  /* Grid with a border, as GitHub's really is — the two properties that make a
+     child-painted fill and an element-painted fill different rectangles. Any
+     mismatch shows up here rather than only on the live site. */
+  .ActionList-content {
+    display: grid; grid-template-columns: 16px 1fr; align-items: center; width: 100%;
+    padding: 6px 8px; border: 1px solid transparent; border-radius: 6px; background: none;
+    font: 400 14px/20px inherit; color: var(--fgColor-default); text-align: left;
+    cursor: pointer; white-space: nowrap;
+  }
+  /* GitHub spaces the children with a margin rule targeting every direct
+     child, not with `gap`. Reproduced verbatim in shape, because an absolutely
+     positioned overlay picks it up too and it shrinks the overlay's width. */
+  .ActionList-content > :not(:last-child, .ActionList-Spacer) { margin-right: var(--control-medium-gap, .5rem); }
+  .ActionList-content:hover { background: var(--bgColor-neutral-muted); }
+  .ActionList-item-visual { display: flex; align-items: center; }
+  .ActionList-item-visual svg:not(.gh-tldr-wand) { width: 16px; height: 16px; fill: currentColor; }
+  .ActionList-item--danger .ActionList-content { color: var(--fgColor-danger); }
+  .ActionList-divider { height: 1px; margin: 8px -8px; background: var(--borderColor-default); }
+
+  .states .variant-label { margin: 0 0 8px; font-size: 12px; color: var(--fgColor-muted); }
+
+  .states { padding: 16px; background: var(--bgColor-default); border: 1px solid var(--borderColor-default); border-radius: 6px; }
+  .states .label { display: block; font: 500 11px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--fgColor-muted); margin-bottom: 12px; }
+  .states .open-menu { position: static; box-shadow: none; margin: 0; }
+  .states .hint { margin: 12px 0 0; font-size: 12px; color: var(--fgColor-muted); }
+  .states .hint button { font: inherit; color: var(--fgColor-default); background: var(--bgColor-default); border: 1px solid var(--borderColor-default); border-radius: 6px; padding: 1px 8px; margin-left: 6px; cursor: pointer; }
+
+  /* Fill demo: the real hover fill, shown large and always on. The mesh markup
+     matches what content.js builds, so the blobs, colours and animations come
+     straight from content.css — only the size and forced opacity are
+     preview-only. */
+  .tldr-fill-demo { display: block; height: 120px; border-radius: 6px; }
+  .tldr-fill-demo .gh-tldr-mesh { opacity: 1 !important; }
+  .tldr-fill-demo.is-paused .gh-tldr-blob { animation-play-state: paused; }
+  .states .legend { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 20px; margin: 12px 0 0; padding: 0; list-style: none; font-size: 12px; color: var(--fgColor-muted); }
+  .states .legend b { color: var(--fgColor-default); font-weight: 500; }
 </style>
 </head>
 <body>
@@ -106,24 +176,55 @@
   <div class="bar">
     <div>
       <h1>GitHub TLDR — local preview</h1>
-      <p>Runs the real <code>content.js</code> and <code>content.css</code> against a fake comment. No extension install, no API key.</p>
+      <p>Runs the real <code>content.js</code> and <code>content.css</code> against fake comments. Open any <code>···</code> menu: <strong>TLDR</strong> sits under <em>Quote reply</em>, in both of GitHub's menu systems. No extension install, no API key.</p>
     </div>
     <span class="spacer"></span>
     <button type="button" id="clear">Clear cache</button>
     <button type="button" id="theme">Toggle theme</button>
   </div>
 
+  <!-- A permanently open menu, so the entry's design can be inspected (and
+       hovered) without clicking anything. Built from the same template as the
+       menus below, inside a comment long enough to qualify. -->
+  <div class="states timeline-comment js-comment-container">
+    <span class="label">Menu entry — always open, both menu systems</span>
+    <div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap">
+      <div>
+        <p class="variant-label">Legacy <code>details-menu</code> — PR timeline, no icons</p>
+        <div class="tldr-menu-slot" data-open="1"></div>
+      </div>
+      <div>
+        <p class="variant-label">Primer <code>ActionList</code> — React issue view, with icons</p>
+        <div class="tldr-menu-slot" data-open="1" data-menu="actionlist"></div>
+      </div>
+    </div>
+    <div class="js-comment-body" hidden>
+      This fixture exists only to give the always-open menu above a comment of its own, long
+      enough to pass the minimum-length check in the content script so that the TLDR entry is
+      actually added to it.
+    </div>
+    <p class="hint">Hover the entry in each menu. The two differ in shape — the legacy item is a full-bleed row, the ActionList hover is an inset rounded box — and the entry is cloned structurally so it follows whichever it joined.</p>
+  </div>
+
   <div class="states">
-    <span class="label">Button states</span>
-    <button type="button" class="gh-tldr-btn"><svg class="gh-tldr-wand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72Z"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg><span>TLDR</span></button>
-    <button type="button" class="gh-tldr-btn is-loading" disabled><svg class="gh-tldr-wand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72Z"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg><span>TLDR</span></button>
+    <span class="label">Hover fill — shown large, always on</span>
+    <div class="gh-tldr-menu-item tldr-fill-demo" id="fill-demo"><span class="gh-tldr-mesh" aria-hidden="true"><span class="gh-tldr-blob"></span><span class="gh-tldr-blob"></span><span class="gh-tldr-blob"></span><span class="gh-tldr-blob"></span><span class="gh-tldr-blob"></span><span class="gh-tldr-blob"></span><span class="gh-tldr-blob"></span></span></div>
+    <ul class="legend">
+      <li><b>Seven blobs, seven timelines.</b> Each colour is its own element with its own path and duration (9–15s), so they never collapse onto one point.</li>
+      <li><b>Proportional falloff.</b> Each blob's edge is a radial ramp in its own percentages, so the softness is identical at 28px and at demo size — a fixed pixel blur would show disc arcs when magnified.</li>
+      <li><b>Transform-only motion.</b> Continuous, compositor-cheap, and independent per blob.</li>
+      <li><b>Clipping frame.</b> The mesh container is <code>inset: 0</code> with <code>overflow: hidden</code>, over an opaque base, so no frame can expose bare menu surface.</li>
+      <li><b>Blobs wider than the strip.</b> 60% of the width each, anchored at 7–94%, so every hue keeps its own patch while overlapping its neighbours.</li>
+      <li><b>Built in JS.</b> <code>content.js</code> appends the mesh span and seven blob spans; the CSS owns everything visual.</li>
+    </ul>
+    <p class="hint">At a real menu item's 28px height only a horizontal slice through the middle of this is visible. <button type="button" id="pause-demo">Pause</button></p>
   </div>
 
   <div class="timeline-comment js-comment-container">
     <div class="timeline-comment-header">
       <strong>octocat</strong> commented on <span>2026-03-14</span>
       <div class="header-right">
-        <div class="timeline-comment-actions">···</div>
+        <div class="timeline-comment-actions tldr-menu-slot"></div>
         <div><span class="Label">Member</span></div>
       </div>
     </div>
@@ -138,13 +239,13 @@
     <div class="timeline-comment-header">
       <strong>monalisa</strong> commented on <span>2026-03-15</span>
       <div class="header-right">
-        <div class="timeline-comment-actions">···</div>
+        <div class="timeline-comment-actions tldr-menu-slot"></div>
         <div><span class="Label">Member</span></div>
       </div>
     </div>
     <div class="js-comment-body">
       <p>Agreed on the second option, but let's land the pinned output path first so the branch is usable this week. The split touches every import site and I would rather review that on its own. Also worth checking whether the CI cache key includes the configuration name — if it does not, we are paying for this twice on every merge queue run.</p>
-      <p>Try the error path in this preview by clicking the second comment's button: the stub fails on purpose.</p>
+      <p>Try the error path in this preview by using this comment's TLDR entry: the stub fails on purpose.</p>
     </div>
   </div>
 
@@ -152,7 +253,7 @@
     <div class="timeline-comment-header">
       <strong>hubot</strong> commented on <span>2026-03-16</span>
       <div class="header-right">
-        <div class="timeline-comment-actions">···</div>
+        <div class="timeline-comment-actions tldr-menu-slot"></div>
         <div><span class="Label">Member</span></div>
       </div>
     </div>
@@ -164,6 +265,7 @@
       <p>Press "Clear cache" above to watch it go back to needing a click.</p>
     </div>
   </div>
+
   <!-- A PR review thread: several comments sharing one .js-comment-container. -->
   <review-thread-collapsible class="timeline-comment js-comment-container js-resolvable-timeline-thread-container">
     <div class="js-inline-comments-container">
@@ -171,26 +273,26 @@
         <div class="timeline-comment-header">
           <strong>hubot</strong> reviewed
           <div class="header-right">
-            <div class="timeline-comment-actions">···</div>
+            <div class="timeline-comment-actions tldr-menu-slot"></div>
             <div><span class="Label">Member</span></div>
           </div>
         </div>
         <div class="js-comment-body">
-          <p>Review thread, first comment. Each comment in a thread needs its own button:
+          <p>Review thread, first comment. Each comment in a thread needs its own entry:
           they share one container, so a naive lookup finds the first header three times and
-          stacks every button there.</p>
+          stacks every entry there.</p>
         </div>
       </div>
       <div class="js-comment review-comment">
         <div class="timeline-comment-header">
           <strong>octocat</strong> replied
           <div class="header-right">
-            <div class="timeline-comment-actions">···</div>
+            <div class="timeline-comment-actions tldr-menu-slot"></div>
             <div><span class="Label">Collaborator</span></div>
           </div>
         </div>
         <div class="js-comment-body">
-          <p>Second reply. This one should carry its own button in its own header, left of the
+          <p>Second reply. This one should carry its own entry in its own menu, left of the
           Collaborator badge, exactly like a top-level comment does.</p>
         </div>
       </div>
@@ -198,12 +300,12 @@
         <div class="timeline-comment-header">
           <strong>monalisa</strong> replied
           <div class="header-right">
-            <div class="timeline-comment-actions">···</div>
+            <div class="timeline-comment-actions tldr-menu-slot"></div>
           </div>
         </div>
         <div class="js-comment-body">
-          <p>Third reply, with no author badge at all — the button still belongs at the left
-          end of this comment's own header row rather than in the one above.</p>
+          <p>Third reply, with no author badge at all — the entry still belongs in this
+          comment's own menu rather than in the one above.</p>
         </div>
       </div>
     </div>
@@ -216,15 +318,15 @@
         <strong>octocat</strong> opened this issue · Issue description (React view)
         <div class="IssueBodyHeader-module__badgesSection__demo" style="display:flex;align-items:center;gap:8px;margin-left:auto">
           <div class="IssueBodyHeader-module__badgeGroup__demo"><span class="Label">Collaborator</span></div>
-          <div class="IssueBodyHeader-module__actionsSection__demo">···</div>
+          <div class="IssueBodyHeader-module__actionsSection__demo tldr-menu-slot" data-menu="actionlist"></div>
         </div>
       </div>
     </div>
     <div data-testid="issue-body-viewer">
       <div data-testid="markdown-body" class="markdown-body">
         <p>This block reproduces GitHub's React issue view, which has no comment action bar at
-        all — the header is a plain flex row. The button is appended to that header rather than
-        dropped into a strip above the text, which is what it used to do here.</p>
+        all — the header is a plain flex row. The menu is appended to that header rather than
+        dropped into a strip above the text.</p>
         <p>The class names carry a build hash on the real site, so the content script matches the
         stable module prefix instead of the full name.</p>
       </div>
@@ -232,7 +334,55 @@
   </div>
 </div>
 
+<!-- One menu definition, cloned into every slot. Items carry octicons, as they
+     do on GitHub — the content script only adds its own icon when the menu it
+     joins uses them. -->
+<template id="menu-template">
+  <details class="tldr-menu"><summary title="Show options">···</summary>
+    <details-menu class="dropdown-menu" role="menu">
+      <span><button type="button" class="dropdown-item" role="menuitem">Copy link</button></span>
+      <span><button type="button" class="dropdown-item" role="menuitem">Copy Markdown</button></span>
+      <span><button type="button" class="dropdown-item js-comment-quote-reply" role="menuitem">Quote reply</button></span>
+      <div class="dropdown-divider"></div>
+      <span><button type="button" class="dropdown-item" role="menuitem">Edit</button></span>
+      <span><button type="button" class="dropdown-item danger" role="menuitem">Delete</button></span>
+    </details-menu>
+  </details>
+</template>
+
+
+<!-- Primer ActionList, as used by the React issue view: an <li role="menuitem">
+     wrapping .ActionList-content, which is the element that takes the hover. -->
+<template id="menu-template-actionlist">
+  <details class="tldr-menu"><summary title="Show options">···</summary>
+    <ul class="dropdown-menu ActionList" role="menu">
+        <li class="ActionList-item" role="menuitem"><button type="button" class="ActionList-content"><span class="ActionList-item-visual"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M7.775 3.275a.75.75 0 0 0 1.06 1.06l1.25-1.25a2 2 0 1 1 2.83 2.83l-2.5 2.5a2 2 0 0 1-2.83 0 .75.75 0 0 0-1.06 1.06 3.5 3.5 0 0 0 4.95 0l2.5-2.5a3.5 3.5 0 0 0-4.95-4.95l-1.25 1.25Zm-4.69 9.64a2 2 0 0 1 0-2.83l2.5-2.5a2 2 0 0 1 2.83 0 .75.75 0 0 0 1.06-1.06 3.5 3.5 0 0 0-4.95 0l-2.5 2.5a3.5 3.5 0 0 0 4.95 4.95l1.25-1.25a.75.75 0 0 0-1.06-1.06l-1.25 1.25a2 2 0 0 1-2.83 0Z"/></svg></span><span class="ActionList-item-label">Copy link</span></button></li>
+        <li class="ActionList-item" role="menuitem"><button type="button" class="ActionList-content js-comment-quote-reply"><span class="ActionList-item-visual"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.75 2.5h12.5a.25.25 0 0 1 .25.25v8.5a.25.25 0 0 1-.25.25H8.061a.75.75 0 0 0-.53.22L5 14.311V11.75a.75.75 0 0 0-.75-.75H1.75a.25.25 0 0 1-.25-.25v-8.5a.25.25 0 0 1 .25-.25ZM14.25 1H1.75A1.75 1.75 0 0 0 0 2.75v8.5C0 12.216.784 13 1.75 13H3.5v3.25a.75.75 0 0 0 1.28.53L8.81 13h5.44A1.75 1.75 0 0 0 16 11.25v-8.5A1.75 1.75 0 0 0 14.25 1Z"/></svg></span><span class="ActionList-item-label">Quote reply</span></button></li>
+        <li class="ActionList-item" role="menuitem"><button type="button" class="ActionList-content"><span class="ActionList-item-visual"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11.013 1.427a1.75 1.75 0 0 1 2.474 0l1.086 1.086a1.75 1.75 0 0 1 0 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a1.125 1.125 0 0 1-1.392-1.392l.93-3.25c.081-.286.235-.547.445-.758l8.61-8.61Z"/></svg></span><span class="ActionList-item-label">Edit</span></button></li>
+      <li class="ActionList-divider" aria-hidden="true"></li>
+        <li class="ActionList-item ActionList-item--danger" role="menuitem"><button type="button" class="ActionList-content"><span class="ActionList-item-visual"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11 1.75V3h2.25a.75.75 0 0 1 0 1.5H2.75a.75.75 0 0 1 0-1.5H5V1.75C5 .784 5.784 0 6.75 0h2.5C10.216 0 11 .784 11 1.75ZM4.496 6.675l.66 6.6a.25.25 0 0 0 .249.225h5.19a.25.25 0 0 0 .249-.225l.66-6.6a.75.75 0 0 1 1.492.149l-.66 6.6A1.75 1.75 0 0 1 10.595 15h-5.19a1.75 1.75 0 0 1-1.741-1.575l-.66-6.6a.75.75 0 1 1 1.492-.15Z"/></svg></span><span class="ActionList-item-label">Delete</span></button></li>
+    </ul>
+  </details>
+</template>
+
 <script>
+  // Fill every menu slot from the template before content.js runs.
+  const tpl = document.getElementById('menu-template');
+  const templates = {
+    dropdown: tpl,
+    actionlist: document.getElementById('menu-template-actionlist'),
+  };
+  for (const slot of document.querySelectorAll('.tldr-menu-slot')) {
+    const source = templates[slot.dataset.menu || 'dropdown'];
+    const menu = source.content.firstElementChild.cloneNode(true);
+    if (slot.dataset.open === '1') {
+      menu.open = true;
+      menu.querySelector('summary').hidden = true;
+      menu.querySelector('.dropdown-menu, .prc-ActionList-ActionList').classList.add('open-menu');
+    }
+    slot.appendChild(menu);
+  }
+
   // Minimal stand-in for the extension APIs content.js expects. The real cache
   // lives in the service worker; here it is a Map, keyed the same way — by the
   // comment text — so the behaviour on screen matches the shipping one.
@@ -277,7 +427,7 @@
     },
   };
 
-  // Empties the stub cache and closes every panel, so the buttons go back to
+  // Empties the stub cache and closes every panel, so the entries go back to
   // needing a click — the state a first-time visitor to a thread sees.
   document.getElementById('clear').addEventListener('click', () => {
     cache.clear();
@@ -286,6 +436,12 @@
       panel.dataset.loaded = '0';
       panel.textContent = '';
     }
+  });
+
+  document.getElementById('pause-demo').addEventListener('click', (e) => {
+    const demo = document.getElementById('fill-demo');
+    const paused = demo.classList.toggle('is-paused');
+    e.target.textContent = paused ? 'Resume' : 'Pause';
   });
 
   document.getElementById('theme').addEventListener('click', () => {

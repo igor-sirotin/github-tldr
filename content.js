@@ -1,4 +1,4 @@
-// GitHub TLDR - injects a "TLDR" button next to every GitHub comment.
+// GitHub TLDR - adds a "TLDR" entry to the ... menu on every GitHub comment.
 
 const BODY_SELECTORS = [
   '.js-comment-body',
@@ -7,29 +7,41 @@ const BODY_SELECTORS = [
   '[data-testid="markdown-body"]',
 ];
 
-// Action bars, where the button is prepended ahead of the existing controls.
-const ACTION_SELECTORS = [
-  '.timeline-comment-actions',
-  '[data-testid="comment-header-right-side-items"]',
-  '.js-comment-header-actions',
+// How the "Quote reply" entry is recognised in a comment's ... menu. The JS
+// hook is checked first; the label is the fallback, and the only part that a
+// non-English UI would miss.
+const QUOTE_SELECTORS = [
+  '.js-comment-quote-reply',
+  '[data-testid="quote-reply"]',
+  '[data-testid="comment-quote-reply"]',
+];
+const QUOTE_LABEL = /^quote reply$/i;
+
+// Anything that behaves like a menu entry, in either the classic details-menu
+// or Primer's ActionList.
+const MENU_ITEM_SELECTORS = ['[role="menuitem"]', '.dropdown-item'];
+
+// GitHub ships two menu implementations, shaped differently rather than merely
+// styled differently:
+//
+//   legacy `details-menu`  <button class="dropdown-item" role="menuitem">,
+//                          hover is a full-bleed accent row, foreground white.
+//   Primer `ActionList`    <li role="menuitem"> wrapping a content element,
+//                          hover is an inset rounded fill on THAT content
+//                          element, not on the li.
+//
+// So the hover styling has to land on the content element where there is one.
+// Real GitHub ships these as hashed CSS-module names
+// (prc-ActionList-ActionListContent-xxxxx), hence the substring match.
+const CONTENT_SELECTORS = [
+  ':scope > [class*="ActionList-content"]',
+  ':scope > [class*="ActionListContent"]',
+  ':scope > button',
+  ':scope > a',
 ];
 
-// The cluster holding the Member/Collaborator badge and the kebab menu. The
-// button goes at the visually-left end of it, ahead of the badge.
-//   classic + PRs: the flex-row-reverse row that wraps .timeline-comment-actions
-//   React issues:  IssueBodyHeader's badgesSection (badgeGroup, then actions)
-const BADGE_ROW_SELECTORS = [
-  '[class*="IssueBodyHeader-module__badgesSection"]',
-];
-
-// The React issue view ships no action bar at all — its header is a plain flex
-// row — so fall back to appending at the end of that header. These are CSS
-// module class names whose trailing hash changes on every GitHub deploy
-// (…__activityHeader__ZGlyB), hence the prefix match on the stable part.
-const HEADER_SELECTORS = [
-  '[class*="ActivityHeader-module__activityHeader"]',
-  '[class*="IssueBodyHeader-module__IssueBodyHeaderContainer"]',
-];
+// Containers we must not climb out of when looking for the entry's outer cell.
+const MENU_SELECTORS = ['details-menu', '[role="menu"]', '.dropdown-menu', 'action-menu'];
 
 // Lucide "wand-sparkles" (https://lucide.dev/icons/wand-sparkles), ISC licensed.
 // Built as nodes rather than an innerHTML string; sized by .gh-tldr-wand in CSS.
@@ -46,8 +58,24 @@ const WAND_PATHS = [
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
+// The resting icon is stroked with a gradient, which needs a paint server in
+// the document. One hidden <svg> serves every entry on the page; content.css
+// supplies the stop colours (and the hover state swaps back to currentColor).
+const GRADIENT_ID = 'gh-tldr-icon-gradient';
+
 const PROCESSED = 'data-tldr-ready';
-const MIN_CHARS = 120; // shorter comments don't need a TLDR
+// The cloned wrapper, used for dedupe; and the element GitHub actually hovers
+// and fills, which is what content.css styles.
+const ENTRY_CLASS = 'gh-tldr-entry';
+// Seconds. At least the longest animation in content.css, so every one of them
+// can start anywhere in its cycle.
+const PHASE_RANGE = 15;
+const MENU_ITEM_CLASS = 'gh-tldr-menu-item';
+// Only long comments are worth an up-front cache lookup. The menu entry itself
+// is offered whatever the length: it takes no space until the menu is opened,
+// and an entry that silently goes missing on short comments just reads as a
+// broken extension. This mattered less when it was a button in the header.
+const PEEK_MIN_CHARS = 120;
 
 // innerText gives the rendered text (collapsed details, hidden nodes dropped);
 // textContent is the fallback where innerText isn't implemented.
@@ -99,7 +127,55 @@ function commentContainerOf(body) {
   return ownContainerOf(body) || body.parentElement;
 }
 
+function ensureGradient() {
+  if (document.getElementById(GRADIENT_ID)) return;
+
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('width', '0');
+  svg.setAttribute('height', '0');
+  svg.style.position = 'absolute';
+  svg.style.pointerEvents = 'none';
+
+  const defs = document.createElementNS(SVG_NS, 'defs');
+  const gradient = document.createElementNS(SVG_NS, 'linearGradient');
+  gradient.setAttribute('id', GRADIENT_ID);
+  // The icon's own 24-unit viewBox, on the diagonal the wand is drawn along.
+  gradient.setAttribute('gradientUnits', 'userSpaceOnUse');
+  gradient.setAttribute('x1', '2');
+  gradient.setAttribute('y1', '22');
+  gradient.setAttribute('x2', '22');
+  gradient.setAttribute('y2', '2');
+
+  ['0%', '38%', '70%', '100%'].forEach((offset, i) => {
+    const stop = document.createElementNS(SVG_NS, 'stop');
+    stop.setAttribute('offset', offset);
+    stop.setAttribute('class', `gh-tldr-stop-${i + 1}`);
+    gradient.appendChild(stop);
+  });
+
+  defs.appendChild(gradient);
+  svg.appendChild(defs);
+  document.body.appendChild(svg);
+}
+
+// The hover fill is a mesh gradient: seven blurred colour blobs behind the
+// label, animated independently. They need real elements, so they are built
+// here; content.css owns their colours and paths.
+function buildMesh() {
+  const mesh = document.createElement('span');
+  mesh.className = 'gh-tldr-mesh';
+  mesh.setAttribute('aria-hidden', 'true');
+  for (let i = 0; i < 7; i += 1) {
+    const blob = document.createElement('span');
+    blob.className = 'gh-tldr-blob';
+    mesh.appendChild(blob);
+  }
+  return mesh;
+}
+
 function wandIcon() {
+  ensureGradient();
   const svg = document.createElementNS(SVG_NS, 'svg');
   svg.setAttribute('viewBox', '0 0 24 24');
   svg.setAttribute('fill', 'none');
@@ -117,26 +193,181 @@ function wandIcon() {
   return svg;
 }
 
-// "Left" is not the same as "first child": GitHub lays the classic header row
-// out with flex-row-reverse, so DOM order there runs right to left. Ask the
-// browser which way the row actually flows rather than assuming.
-function insertLeftmost(row, btn) {
-  const direction = (getComputedStyle(row).flexDirection || 'row');
-  if (direction.includes('reverse')) row.appendChild(btn);
-  else row.insertBefore(btn, row.firstChild);
+// Matched against descendants as well as the element itself: role="menuitem"
+// sits on the <li> in ActionList while the hook sits on the inner content
+// button. The label regex is no fallback there — a collapsed menu has no
+// rendered text at all, and a non-English UI never matches it.
+function isQuoteReply(el) {
+  if (QUOTE_SELECTORS.some((sel) => el.matches(sel) || el.querySelector(sel))) return true;
+  return QUOTE_LABEL.test(textOf(el));
 }
 
-function makeButton() {
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'gh-tldr-btn';
-  btn.title = 'Summarize this comment with AI';
-  btn.appendChild(wandIcon());
+// Swap the visible label for our own, wrapped in .gh-tldr-label so the design
+// has something to paint the gradient onto. Where GitHub already wraps its
+// label in an element of its own, that wrapper is reused so its spacing
+// survives; otherwise the bare text node is replaced.
+function wrapLabel(root, text) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  while (walker.nextNode()) {
+    if (walker.currentNode.nodeValue.trim()) nodes.push(walker.currentNode);
+  }
+
   const label = document.createElement('span');
   label.className = 'gh-tldr-label';
-  label.textContent = 'TLDR';
-  btn.appendChild(label);
-  return btn;
+  label.textContent = text;
+
+  if (!nodes.length) {
+    root.appendChild(label);
+    return label;
+  }
+
+  const first = nodes[0];
+  const holder = first.parentElement;
+
+  // Where GitHub already has an element around the label (Primer's ItemLabel),
+  // paint that one instead of nesting another span inside it: an extra element
+  // inside a flex or grid slot becomes visible spacing.
+  if (holder !== root && holder.childNodes.length === 1) {
+    holder.classList.add('gh-tldr-label');
+    holder.textContent = text;
+    for (const extra of nodes.slice(1)) extra.nodeValue = '';
+    return holder;
+  }
+
+  first.replaceWith(label);
+  for (const extra of nodes.slice(1)) extra.nodeValue = '';
+  return label;
+}
+
+// The only way to look exactly like a GitHub menu item is to be one: clone the
+// neighbouring entry whole -- wrapper element, nested icon slot, Primer's
+// data-* attributes, the lot -- then swap the label and the glyph. Building a
+// <button> and copying a class name is what made it read as a button.
+function makeMenuItem(cell) {
+  const entry = cell.cloneNode(true);
+  entry.classList.add(ENTRY_CLASS);
+
+  const all = [entry, ...entry.querySelectorAll('*')];
+  for (const el of all) {
+    // Ids must stay unique, and anything pointing at the original's id is now
+    // dangling.
+    el.removeAttribute('id');
+    el.removeAttribute('aria-labelledby');
+    el.removeAttribute('aria-describedby');
+    // Behavioural hooks belong to Quote reply, not to us.
+    el.removeAttribute('data-testid');
+    el.removeAttribute('value');
+    el.removeAttribute('for');
+    if (el.tagName === 'A') el.removeAttribute('href');
+    for (const cls of [...el.classList]) {
+      if (cls.startsWith('js-')) el.classList.remove(cls);
+    }
+    el.removeAttribute('disabled');
+  }
+
+  // content.css styles the element GitHub itself hovers and fills — the
+  // actionable one — not the layout wrapper around it.
+  const selector = MENU_ITEM_SELECTORS.join(',');
+  const outer = entry.matches(selector) ? entry : entry.querySelector(selector) || entry;
+
+  // In ActionList that is the content element inside the li, not the li.
+  let item = outer;
+  for (const sel of CONTENT_SELECTORS) {
+    const content = outer.querySelector(sel);
+    if (content) {
+      item = content;
+      break;
+    }
+  }
+
+  item.classList.add(MENU_ITEM_CLASS);
+  item.dataset.tldrMenu = item === outer ? 'dropdown' : 'actionlist';
+  item.title = 'Summarize this comment with AI';
+
+  // Swap the glyph in place, keeping whatever wrapper and sizing GitHub gave it.
+  const icon = item.querySelector('svg');
+  if (icon) {
+    const wand = wandIcon();
+    for (const cls of icon.classList) {
+      if (!cls.startsWith('octicon-')) wand.classList.add(cls);
+    }
+    for (const attr of ['width', 'height', 'aria-hidden', 'focusable', 'data-component']) {
+      if (icon.hasAttribute(attr)) wand.setAttribute(attr, icon.getAttribute(attr));
+    }
+    // If GitHub sized the glyph by neither attribute nor class, the SVG would
+    // have no intrinsic size at all.
+    if (!wand.hasAttribute('width') && !wand.classList.length) {
+      wand.setAttribute('width', '16');
+      wand.setAttribute('height', '16');
+    }
+    icon.replaceWith(wand);
+  }
+
+  wrapLabel(item, 'TLDR');
+
+  // Behind the label and icon, which content.css lifts above it with z-index.
+  item.insertBefore(buildMesh(), item.firstChild);
+
+  // Start this entry part-way through its animations, so several on a page do
+  // not run in lockstep. A negative delay starts an animation mid-cycle, and on
+  // an infinite one it wraps, so this single range covers the label's 8s ramp
+  // and the blobs' 9-15s drifts alike. Inherited by both from the entry root.
+  entry.style.setProperty('--gh-tldr-phase', `-${(Math.random() * PHASE_RANGE).toFixed(2)}s`);
+
+  return entry;
+}
+
+// The entry may be wrapped in a layout span; insert after the outermost
+// wrapper that still sits inside the menu, so we land beside it rather than
+// inside its box.
+function outerCell(item) {
+  let cell = item;
+  while (
+    cell.parentElement &&
+    cell.parentElement !== document.body &&
+    cell.parentElement.children.length === 1 &&
+    !MENU_SELECTORS.some((sel) => cell.parentElement.matches(sel))
+  ) {
+    cell = cell.parentElement;
+  }
+  return cell;
+}
+
+// A border only counts when there is a border style; browsers compute the
+// width to 0 without one, but not every DOM implementation does.
+function borderWidth(cs, side) {
+  const style = cs.getPropertyValue(`border-${side}-style`);
+  if (!style || style === 'none' || style === 'hidden') return 0;
+  return parseFloat(cs.getPropertyValue(`border-${side}-width`)) || 0;
+}
+
+// The mesh is absolutely positioned, so `inset: 0` reaches only the item's
+// PADDING box — the border ring stays unpainted and shows as a margin down one
+// side, which is exactly what kept coming back. The item's own background, and
+// every neighbouring item's hover fill, cover the BORDER box instead. That
+// difference is not knowable in CSS, because the widths belong to GitHub's
+// stylesheet, so measure them here and pull the mesh out over the border.
+// `.gh-tldr-menu-item` deliberately does not set `overflow: hidden`, which
+// would clip this straight back to the padding box; the mesh clips itself.
+function fitMesh(item, mesh) {
+  const cs = getComputedStyle(item);
+  // The mesh is only positioned against the item if the item is positioned.
+  if (cs.position === 'static') item.style.position = 'relative';
+  const inset = ['top', 'right', 'bottom', 'left']
+    .map((side) => `-${borderWidth(cs, side)}px`)
+    .join(' ');
+  // Set with priority, so a host rule cannot move the overlay either.
+  mesh.style.setProperty('inset', inset, 'important');
+}
+
+function closeMenu(el) {
+  const details = el.closest('details');
+  if (details) {
+    details.open = false;
+    return;
+  }
+  el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
 }
 
 function makePanel() {
@@ -183,15 +414,13 @@ function setState(panel, cls, text) {
   panel.textContent = text;
 }
 
-async function summarize(btn, panel, body) {
+async function summarize(panel, body) {
   const text = textOf(body);
   if (!text) {
     setState(panel, 'gh-tldr-error', 'Nothing to summarize.');
     return;
   }
 
-  btn.disabled = true;
-  btn.classList.add('is-loading');
   setState(panel, 'gh-tldr-loading', 'Summarizing…');
 
   try {
@@ -204,76 +433,31 @@ async function summarize(btn, panel, body) {
     panel.dataset.loaded = '1';
   } catch (err) {
     setState(panel, 'gh-tldr-error', `TLDR failed: ${err.message}`);
-  } finally {
-    btn.disabled = false;
-    btn.classList.remove('is-loading');
   }
+}
+
+// Panels are created up front, one per comment, and remembered so a menu entry
+// can find the one it belongs to.
+const panels = new WeakMap();
+
+// One panel per comment, created on first need and reused after that.
+function panelFor(body) {
+  const existing = panels.get(body);
+  if (existing) return existing;
+
+  const panel = makePanel();
+  body.parentElement.insertBefore(panel, body);
+  panels.set(body, panel);
+  return panel;
 }
 
 function attach(body) {
   if (body.hasAttribute(PROCESSED)) return;
   body.setAttribute(PROCESSED, '1');
 
-  if (textOf(body).length < MIN_CHARS) return;
+  if (textOf(body).length < PEEK_MIN_CHARS) return;
 
-  const container = commentContainerOf(body);
-  if (!container) return;
-
-  const btn = makeButton();
-  const panel = makePanel();
-
-  let placed = false;
-
-  // Preferred: immediately left of the Member/Collaborator badge.
-  for (const sel of BADGE_ROW_SELECTORS) {
-    const row = container.querySelector(sel);
-    if (row) {
-      insertLeftmost(row, btn);
-      placed = true;
-      break;
-    }
-  }
-
-  // Classic and PR headers have no badge wrapper of their own; the badge sits
-  // beside .timeline-comment-actions in the row above it.
-  if (!placed) {
-    const actions = container.querySelector('.timeline-comment-actions');
-    if (actions && actions.parentElement) {
-      insertLeftmost(actions.parentElement, btn);
-      placed = true;
-    }
-  }
-
-  if (!placed) for (const sel of ACTION_SELECTORS) {
-    const actions = container.querySelector(sel);
-    if (actions) {
-      actions.insertBefore(btn, actions.firstChild);
-      placed = true;
-      break;
-    }
-  }
-
-  if (!placed) {
-    for (const sel of HEADER_SELECTORS) {
-      const header = container.querySelector(sel);
-      if (header) {
-        btn.classList.add('gh-tldr-btn--header');
-        header.appendChild(btn);
-        placed = true;
-        break;
-      }
-    }
-  }
-
-  // Last resort: its own row above the body.
-  if (!placed) {
-    const bar = document.createElement('div');
-    bar.className = 'gh-tldr-bar';
-    bar.appendChild(btn);
-    body.parentElement.insertBefore(bar, body);
-  }
-
-  body.parentElement.insertBefore(panel, body);
+  const panel = panelFor(body);
 
   // If this exact comment text was summarized before, show it straight away.
   // A miss (including an edited comment, whose text now hashes differently)
@@ -288,33 +472,131 @@ function attach(body) {
       panel.dataset.loaded = '1';
     })
     .catch(() => {}); // no background worker (or no cache) is not an error
+}
 
-  btn.addEventListener('click', (e) => {
+// The comment a menu belongs to. Classic menus sit inside the comment, so
+// climbing finds it; Primer portals its menus to the end of the document, so
+// there we climb from whatever was clicked to open it instead.
+let lastAnchor = null;
+// ...and GitHub re-renders the menu after opening it, which can replace the
+// trigger too. Remember the comment whose menu was last opened, so a re-render
+// does not orphan the entry. It is only consulted after both the menu and the
+// trigger have failed to resolve, and any live trigger wins over it, so
+// another comment's menu cannot inherit a stale value.
+let lastBody = null;
+
+function ownCommentOf(el) {
+  let node = el.parentElement;
+  while (node && node !== document.body) {
+    const bodies = commentBodiesIn(node);
+    if (bodies.length === 1) return bodies[0];
+    if (bodies.length > 1) return null; // a thread: ambiguous, give up
+    node = node.parentElement;
+  }
+  return null;
+}
+
+function commentForMenu(item) {
+  const found =
+    ownCommentOf(item) ||
+    (lastAnchor && lastAnchor.isConnected ? ownCommentOf(lastAnchor) : null) ||
+    (lastBody && lastBody.isConnected ? lastBody : null);
+  if (found) lastBody = found;
+  return found;
+}
+
+function addMenuEntry(quote) {
+  const cell = outerCell(quote);
+  const next = cell.nextElementSibling;
+  if (next && next.classList.contains(ENTRY_CLASS)) return; // already there
+
+  const body = commentForMenu(quote);
+  if (!body) return;
+
+  attach(body); // a lazily rendered comment may not have been peeked yet
+
+  const item = makeMenuItem(cell);
+  item.addEventListener('click', (e) => {
     e.preventDefault();
     e.stopPropagation();
-    // Once a summary exists, the button just toggles it.
+    closeMenu(item);
+    // Built here rather than up front, so a comment nobody summarizes costs
+    // no DOM at all.
+    const panel = panelFor(body);
     if (panel.dataset.loaded === '1') {
       panel.hidden = !panel.hidden;
       return;
     }
-    summarize(btn, panel, body);
+    summarize(panel, body);
   });
+
+  cell.insertAdjacentElement('afterend', item);
+
+  // Only measurable once it is in the document.
+  const styled = item.querySelector('.' + MENU_ITEM_CLASS) || item;
+  const mesh = styled.querySelector('.gh-tldr-mesh');
+  if (mesh) fitMesh(styled, mesh);
+}
+
+// Menus are cheap to re-check and are re-rendered on every open, so this runs
+// on mutations and right after any click.
+function scanMenus() {
+  for (const sel of MENU_ITEM_SELECTORS) {
+    for (const candidate of document.querySelectorAll(sel)) {
+      if (candidate.closest('.' + ENTRY_CLASS)) continue;
+      if (isQuoteReply(candidate)) addMenuEntry(candidate);
+    }
+  }
 }
 
 function scan() {
   for (const sel of BODY_SELECTORS) {
     for (const body of document.querySelectorAll(sel)) attach(body);
   }
+  scanMenus();
 }
 
 let pending = null;
+let menuFrame = null;
 const observer = new MutationObserver(() => {
+  // GitHub fills these menus in after opening them and re-renders them
+  // wholesale, which throws our entry away. Waiting for the debounce below
+  // means the entry visibly flicks out and back, so menus are re-checked on
+  // the very next frame; it is only a querySelectorAll over menu items.
+  if (menuFrame === null) {
+    menuFrame = requestAnimationFrame(() => {
+      menuFrame = null;
+      scanMenus();
+    });
+  }
+
   if (pending) return;
   pending = setTimeout(() => {
     pending = null;
     scan();
   }, 300);
 });
+
+// A portalled menu appears only once its trigger is clicked, and waiting for
+// the mutation debounce would show the menu before our entry. Re-check on the
+// next frames instead; the observer stays as the backstop.
+document.addEventListener(
+  'click',
+  (e) => {
+    const el = e.target instanceof Element ? e.target : null;
+    if (!el) return;
+    lastAnchor = el.closest('summary, button, [role="button"]') || el;
+    // Bind the memory to whatever was just clicked, while it is still in the
+    // document. Clearing it instead would throw away the only reference left
+    // once a re-render replaces the trigger.
+    const clickedIn = ownCommentOf(lastAnchor);
+    if (clickedIn) lastBody = clickedIn;
+    // Menu contents can arrive well after the click, so keep looking for a
+    // while rather than only on the next few frames.
+    for (const delay of [0, 60, 200, 500, 1000]) setTimeout(scanMenus, delay);
+  },
+  true
+);
 
 scan();
 observer.observe(document.body, { childList: true, subtree: true });

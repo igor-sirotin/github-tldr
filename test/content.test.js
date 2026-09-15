@@ -1,74 +1,85 @@
 const { JSDOM } = require('jsdom');
 const fs = require('fs');
 const vm = require('vm');
+const path = require('path');
 
-const SRC = require('path').join(__dirname, '..', 'content.js');
+const SRC = path.join(__dirname, '..', 'content.js');
 const long = 'This is a long GitHub comment that definitely deserves a summary. '.repeat(4);
 
-// The issue-description markup mirrors what github.com actually serves for the
-// React issue view (data-testid and CSS-module class names taken from a fetched
-// issue page). The class hash is deliberately a different one from the live
-// page, to prove we match the module prefix and not the build hash.
+// A classic comment carries its ... menu inline, inside the comment itself.
+// Items are wrapped in a layout span and carry an octicon, the way GitHub
+// builds them — the entry has to reproduce that, not just the class name.
+const menuItem = (label, extraClass = '', icon = 'octicon-link') => `
+      <span data-view-component="true">
+        <button class="dropdown-item btn-link ${extraClass}" role="menuitem" data-view-component="true">
+          <svg class="octicon ${icon}" width="16" height="16" aria-hidden="true" data-component="Octicon"><path d="M0 0"/></svg>
+          ${label}
+        </button>
+      </span>`;
+
+// Primer's ActionList, with the hashed CSS-module names real GitHub ships —
+// not the plain .ActionList-content of the design's own preview. The hook sits
+// on the inner content button while role="menuitem" sits on the li.
+const actionListItem = (label, extraClass = '') => `
+      <li role="menuitem" class="prc-ActionList-ActionListItem-uq6I7">
+        <button type="button" class="prc-ActionList-ActionListContent-sg9-x ${extraClass}" style="border: 2px solid transparent; position: relative">
+          <span class="prc-ActionList-Visual-49ccF prc-ActionList-VisualWrap-rfjV5">
+            <svg class="octicon octicon-quote" width="16" height="16" aria-hidden="true"><path d="M0 0"/></svg>
+          </span>
+          <span class="prc-ActionList-ItemLabel-TSrdx">${label}</span>
+        </button>
+      </li>`;
+
+const classicMenu = (id) => `
+  <details class="details-overlay" id="${id}-details">
+    <summary class="timeline-comment-action" id="${id}-kebab">…</summary>
+    <details-menu class="dropdown-menu">
+      ${menuItem('Copy link')}
+      ${menuItem('Copy Markdown')}
+      ${menuItem('Quote reply', 'js-comment-quote-reply', 'octicon-quote')}
+      <div class="dropdown-divider" role="none"></div>
+      ${menuItem('Edit', '', 'octicon-pencil')}
+      ${menuItem('Delete', '', 'octicon-trash')}
+    </details-menu>
+  </details>`;
+
 const dom = new JSDOM(`<!doctype html><body>
-  <div class="js-comment-container">
-    <div class="timeline-comment-header">
-      <div class="d-flex flex-row-reverse flex-items-center" id="classic-row" style="display:flex;flex-direction:row-reverse">
-        <div class="timeline-comment-actions"><button>…</button></div>
-        <div class="d-none d-sm-flex"><span class="tooltipped"><span class="Label ml-1 tmp-ml-1">Member</span></span></div>
-      </div>
-    </div>
+  <div class="js-comment-container" id="comment-a">
+    <div class="timeline-comment-header">${classicMenu('a')}</div>
     <div class="comment-body js-comment-body">${long}</div>
   </div>
-  <div data-testid="comment-viewer-outer-box">
-    <div data-testid="comment-body">${long}</div>
+
+  <div class="js-comment-container" id="comment-b">
+    <div class="timeline-comment-header">${classicMenu('b')}</div>
+    <div class="comment-body js-comment-body">${long} Second top-level comment.</div>
   </div>
-  <div class="js-comment-container">
-    <div class="comment-body js-comment-body">too short</div>
+
+  <div class="js-comment-container" id="comment-short">
+    <div class="timeline-comment-header">${classicMenu('short')}</div>
+    <div class="comment-body js-comment-body">LGTM</div>
   </div>
-  <!-- A PR review thread, as github.com serves it: three comments sharing one
-       .js-comment-container, each with its own header and reversed action row. -->
-  <review-thread-collapsible class="js-comment-container js-resolvable-timeline-thread-container">
+
+  <!-- A PR review thread: three comments sharing one .js-comment-container. -->
+  <review-thread-collapsible class="js-comment-container">
     <div class="js-inline-comments-container">
       <div class="js-comment review-comment" id="discussion_r1">
-        <div class="flex-row-reverse" id="thread-row-1" style="display:flex;flex-direction:row-reverse">
-          <div class="timeline-comment-actions"><button>…</button></div>
-          <span class="Label">Member</span>
-        </div>
+        ${classicMenu('r1')}
         <div class="comment-body js-comment-body">${long} First reply in the thread.</div>
       </div>
       <div class="js-comment review-comment" id="discussion_r2">
-        <div class="flex-row-reverse" id="thread-row-2" style="display:flex;flex-direction:row-reverse">
-          <div class="timeline-comment-actions"><button>…</button></div>
-          <span class="Label">Collaborator</span>
-        </div>
+        ${classicMenu('r2')}
         <div class="comment-body js-comment-body">${long} Second reply in the thread.</div>
-      </div>
-      <div class="js-comment review-comment" id="discussion_r3">
-        <div class="flex-row-reverse" id="thread-row-3" style="display:flex;flex-direction:row-reverse">
-          <div class="timeline-comment-actions"><button>…</button></div>
-        </div>
-        <div class="comment-body js-comment-body">${long} Third reply in the thread.</div>
       </div>
     </div>
   </review-thread-collapsible>
-  <div data-testid="issue-body" class="react-issue-body IssueBody-module__innerContainer__xxxx">
-    <h2 class="sr-only">Description</h2>
-    <div class="IssueBody-module__headerRow__xxxx">
-      <div class="IssueBody-module__commentBorder__xxxx">
-        <div class="IssueBodyHeader-module__IssueBodyHeaderContainer__xxxx">
-          <div class="ActivityHeader-module__activityHeader__xxxx">
-            <div class="IssueBodyHeader-module__avatarContainer__xxxx"></div>
-            <div class="IssueBodyHeader-module__titleSection__xxxx"></div>
-            <div class="IssueBodyHeader-module__badgesSection__xxxx" id="issue-row" style="display:flex">
-              <div class="IssueBodyHeader-module__badgeGroup__xxxx"><span class="Label">Collaborator</span></div>
-              <div class="IssueBodyHeader-module__actionsSection__xxxx"><button>…</button></div>
-            </div>
-          </div>
-        </div>
-        <div id="issue-body-viewer" data-testid="issue-body-viewer">
-          <div data-testid="markdown-body" class="markdown-body">${long}</div>
-        </div>
-      </div>
+
+  <!-- React issue description: Primer ActionList, portalled out of the comment. -->
+  <div data-testid="issue-body" class="react-issue-body">
+    <div class="ActivityHeader-module__activityHeader__xxxx">
+      <button id="issue-kebab" aria-haspopup="true">…</button>
+    </div>
+    <div data-testid="issue-body-viewer">
+      <div data-testid="markdown-body" class="markdown-body">${long} The issue description.</div>
     </div>
   </div>
 </body>`, { pretendToBeVisual: true, runScripts: 'outside-only' });
@@ -90,115 +101,258 @@ ctx.chrome = chrome;
 vm.runInContext(fs.readFileSync(SRC, 'utf8'), ctx);
 
 const doc = dom.window.document;
-const assert = (cond, msg) => { if (!cond) { console.error('FAIL:', msg); process.exitCode = 1; } else console.log('ok -', msg); };
+const assert = (c, m) => { if (!c) { console.error('FAIL:', m); process.exitCode = 1; } else console.log('ok -', m); };
 
-const btns = doc.querySelectorAll('.gh-tldr-btn');
-assert(btns.length === 6, `a button per comment: 2 comments + 3 thread replies + the issue description (got ${btns.length})`);
-// Visual order is what matters, and the classic row runs right-to-left.
-function visualOrder(rowId) {
-  const row = doc.getElementById(rowId);
-  const kids = [...row.children];
-  const reversed = row.style.flexDirection.includes('reverse');
-  return (reversed ? kids.reverse() : kids).map((el) =>
-    el.classList.contains('gh-tldr-btn') ? 'TLDR' : (el.textContent.trim().replace('…', 'kebab') || '?')
-  );
-}
-
-const classicOrder = visualOrder('classic-row');
-assert(classicOrder[0] === 'TLDR', `classic/PR: button is leftmost, before the badge (got ${classicOrder.join(' | ')})`);
-assert(classicOrder.indexOf('TLDR') < classicOrder.indexOf('Member'), 'classic/PR: button sits left of the Member badge');
-assert(!doc.querySelector('.timeline-comment-actions .gh-tldr-btn'), 'classic/PR: button moved out of the kebab action bar');
-
-// The reported bug: three comments in one thread put all three buttons in the
-// first comment's header instead of one each.
-for (const n of [1, 2, 3]) {
-  const comment = doc.getElementById('discussion_r' + n);
-  const own = comment.querySelectorAll('.gh-tldr-btn');
-  assert(own.length === 1, `thread comment ${n} has exactly one button (got ${own.length})`);
-  assert(own[0].closest('.js-comment') === comment, `thread comment ${n}'s button stays in its own comment`);
-  const row = doc.getElementById('thread-row-' + n);
-  assert([...row.children].pop() === own[0], `thread comment ${n}: button is leftmost in its own row`);
-}
-assert(doc.querySelectorAll('review-thread-collapsible .gh-tldr-btn').length === 3, 'thread has three buttons total, not stacked');
-
-const issueOrder = visualOrder('issue-row');
-assert(issueOrder[0] === 'TLDR', `issue: button is leftmost in the badges row (got ${issueOrder.join(' | ')})`);
-assert(issueOrder.indexOf('TLDR') < issueOrder.indexOf('Collaborator'), 'issue: button sits left of the Collaborator badge');
-assert(btns[0].querySelector('svg.gh-tldr-wand'), 'button carries the wand icon with the design class');
-assert(btns[0].querySelectorAll('svg.gh-tldr-wand path').length === 8, 'icon has all 8 lucide wand-sparkles paths');
-assert(btns[0].querySelector('svg.gh-tldr-wand').namespaceURI === 'http://www.w3.org/2000/svg', 'icon built in the SVG namespace');
-assert(!btns[0].querySelector('svg').hasAttribute('width'), 'icon sized by CSS (14x14), not width attributes');
-assert(btns[0].querySelector('.gh-tldr-label').textContent === 'TLDR', 'button still reads TLDR');
-assert(doc.querySelector('[data-testid="comment-viewer-outer-box"] .gh-tldr-bar .gh-tldr-btn'), 'react comment: button falls back to its own bar');
-
-// The bug: on GitHub Issues the description has no action bar, so the button
-// used to land in a row above the body instead of up in the header.
-const issueBody = doc.querySelector('[data-testid="issue-body"]');
-const issueBtn = issueBody.querySelector('.gh-tldr-btn');
-assert(issueBtn, 'issue description gets a button');
-assert(
-  issueBtn.closest('[class*="ActivityHeader-module__activityHeader"]'),
-  'issue description: button sits in the header, not above the body'
+// --- stylesheet invariant ---
+// An element's background covers its BORDER box; an absolutely positioned child
+// covers its parent's PADDING box. Painting the base colour in both places
+// gives two rectangles of different sizes and a visible seam; painting it only
+// on the mesh gives one rectangle that is inset from every neighbouring item.
+// So exactly one rule may paint it, and it must be the item — the box GitHub's
+// own hover fills use.
+const css = fs.readFileSync(path.join(__dirname, '..', 'content.css'), 'utf8');
+const fills = css
+  .replace(/\/\*[\s\S]*?\*\//g, '')
+  .split('}')
+  .filter((block) => /background[^:]*:[^;]*--tldr-base/.test(block))
+  .map((block) => block.split('{')[0].trim().split('\n').pop().trim());
+assert(fills.length === 1, `exactly one rule paints the base fill (got ${fills.length}: ${fills.join(' / ')})`);
+assert(fills[0] === '.gh-tldr-mesh', `and it is the mesh (got ${fills[0]})`);
+const stripComments = (text) => text.replace(/\/\*[\s\S]*?\*\//g, '');
+const itemRule = stripComments(
+  css.slice(css.indexOf('.gh-tldr-menu-item {'), css.indexOf('}', css.indexOf('.gh-tldr-menu-item {')))
 );
-assert(!issueBody.querySelector('.gh-tldr-bar'), 'issue description: no fallback bar is created');
-assert(!issueBtn.classList.contains('gh-tldr-btn--header'), 'badge-row placement does not need the right-align modifier');
-assert(
-  issueBody.querySelector('[data-testid="issue-body-viewer"] .gh-tldr-panel'),
-  'issue description: panel still renders next to the body'
-);
+assert(!/overflow\s*:\s*hidden/.test(itemRule),
+  'the item does not clip, which would undo the mesh being pulled over the border');
+const entryIn = (root) => root.querySelector('.gh-tldr-entry');
+const actionable = (entry) => entry.querySelector('.gh-tldr-menu-item') || entry;
+const labelsIn = (menu) => [...menu.querySelectorAll('[role="menuitem"]')].map((el) => el.textContent.trim());
+
+// --- the menu entry, classic inline menus ---
+const menuA = doc.querySelector('#a-details details-menu');
+assert(entryIn(menuA), 'a TLDR entry is added to the comment menu');
+assert(labelsIn(menuA).join(' | ') === 'Copy link | Copy Markdown | Quote reply | TLDR | Edit | Delete',
+  `entry sits directly under Quote reply (got ${labelsIn(menuA).join(' | ')})`);
+
+const quoteCell = menuA.querySelector('.js-comment-quote-reply').parentElement;
+assert(quoteCell.nextElementSibling === entryIn(menuA), 'entry is a sibling of the Quote reply cell, not nested inside it');
+assert(entryIn(menuA).previousElementSibling === quoteCell, 'nothing was inserted between Quote reply and the entry');
+
+const divider = menuA.querySelector('.dropdown-divider');
+assert(entryIn(menuA).compareDocumentPosition(divider) & 4, 'entry stays in the first section, above the divider');
+
+// It must *be* a GitHub menu item, not a button wearing its class name.
+const quoteCellA = menuA.querySelector('.js-comment-quote-reply').parentElement;
+const entryA = entryIn(menuA);
+assert(entryA.tagName === quoteCellA.tagName, `entry has the same wrapper element as a real item (${entryA.tagName} vs ${quoteCellA.tagName})`);
+assert(actionable(entryA).tagName === 'BUTTON' && actionable(entryA).className.includes('dropdown-item btn-link'),
+  'the actionable element keeps the real item classes, including the button reset');
+assert(actionable(entryA).getAttribute('data-view-component') === 'true', "Primer's styling attributes survive the clone");
+assert(actionable(entryA).getAttribute('role') === 'menuitem', 'entry is exposed as a menu item');
+assert(entryA.textContent.trim() === 'TLDR', `label reads TLDR and nothing else (got ${JSON.stringify(entryA.textContent.trim())})`);
+assert(!entryA.textContent.includes('Quote'), 'the cloned label is gone');
+
+// --- the design: gradient label, gradient icon, mesh hover fill ---
+assert(actionable(entryA).classList.contains('gh-tldr-menu-item'),
+  'the styled class lands on the element GitHub hovers, not the layout wrapper');
+assert(actionable(entryA).dataset.tldrMenu === 'dropdown',
+  `the legacy menu is tagged as the dropdown variant (got ${actionable(entryA).dataset.tldrMenu})`);
+const labelEl = entryA.querySelector('.gh-tldr-label');
+assert(labelEl && labelEl.textContent === 'TLDR', 'label is wrapped so the gradient has something to paint');
+
+// Each entry starts part-way through its animations, so a page of them does
+// not pulse in lockstep.
+const phase = entryA.style.getPropertyValue('--gh-tldr-phase');
+assert(/^-\d+(\.\d+)?s$/.test(phase), `entry carries a negative animation phase (got ${JSON.stringify(phase)})`);
+assert(parseFloat(phase) > -15.01 && parseFloat(phase) <= 0, 'phase is within the longest animation cycle');
+
+const phases = [...doc.querySelectorAll('.gh-tldr-entry')].map((el) => el.style.getPropertyValue('--gh-tldr-phase'));
+assert(phases.every((p) => p), 'every entry gets one');
+assert(new Set(phases).size > 1, `phases differ between entries (got ${phases.join(', ')})`);
+
+const mesh = actionable(entryA).querySelector('.gh-tldr-mesh');
+assert(mesh, 'hover mesh is built into the entry');
+assert(mesh.style.inset === '-0px -0px -0px -0px',
+  `no border on this item, so the mesh sits flush (got ${JSON.stringify(mesh.style.inset)})`);
+assert(mesh.querySelectorAll('.gh-tldr-blob').length === 7, 'mesh has the seven blobs the design animates');
+assert(mesh.getAttribute('aria-hidden') === 'true', 'mesh is decorative');
+assert(actionable(entryA).firstElementChild === mesh, 'mesh sits behind the icon and label');
+
+const paint = doc.getElementById('gh-tldr-icon-gradient');
+assert(paint, 'a gradient paint server is injected for the icon stroke');
+assert(paint.tagName.toLowerCase() === 'lineargradient', 'paint server is a linearGradient');
+const stops = paint.querySelectorAll('stop');
+assert(stops.length === 4, `gradient has four stops (got ${stops.length})`);
+assert([...stops].every((st, i) => st.getAttribute('class') === `gh-tldr-stop-${i + 1}`),
+  'stops carry the classes content.css colours them with');
+assert(doc.querySelectorAll('#gh-tldr-icon-gradient').length === 1, 'only one paint server for the whole page');
+
+// Icon: same slot, same sizing, wand glyph.
+const wand = entryA.querySelector('svg');
+assert(wand && wand.classList.contains('gh-tldr-wand'), 'entry carries the wand glyph');
+assert(wand.classList.contains('octicon'), "it keeps GitHub's octicon class so it is sized and spaced natively");
+assert(wand.closest('.gh-tldr-menu-item'), 'wand is inside the styled item, so the gradient stroke rule matches');
+assert(wand.parentElement === actionable(entryA),
+  'classic menu: the wand is a direct child, so it does get the 8px gap');
+const classicLabel = entryA.querySelector('.gh-tldr-label');
+assert(classicLabel.tagName === 'SPAN' && classicLabel.parentElement === actionable(entryA),
+  'classic menu: a bare text label is replaced by our own span, at the same level');
+assert(!wand.classList.contains('octicon-quote'), "but not the original glyph's specific class");
+assert(wand.getAttribute('width') === '16' && wand.getAttribute('height') === '16', 'icon keeps the real item dimensions');
+assert(wand.querySelectorAll('path').length === 8, 'and is the full lucide wand, not the cloned path');
+
+// Nothing that belonged to Quote reply may come along.
+assert(!entryA.querySelector('.js-comment-quote-reply') && !entryA.classList.contains('js-comment-quote-reply'),
+  'no js- behaviour hooks are cloned');
+assert(!entryA.querySelector('[id]') && !entryA.hasAttribute('id'), 'no duplicated ids');
+assert(doc.querySelectorAll('.gh-tldr-btn').length === 0, 'no injected button remains anywhere');
+
+// One entry per comment, including inside a review thread.
+assert(entryIn(doc.querySelector('#b-details details-menu')), 'second comment gets its own entry');
+for (const n of [1, 2]) {
+  const reply = doc.getElementById('discussion_r' + n);
+  assert(reply.querySelectorAll('.gh-tldr-entry').length === 1, `thread reply ${n} has exactly one entry`);
+}
+// A short comment still gets the entry: it costs no space until the menu is
+// opened, and going missing reads as the extension being broken. Only the
+// up-front cache lookup is skipped for it.
+const shortEntry = doc.querySelector('#comment-short .gh-tldr-entry');
+assert(shortEntry, 'a short comment is still offered the entry');
+assert(!doc.querySelector('#comment-short .gh-tldr-panel'), 'but no panel is built until it is actually used');
+assert(sent.filter((m) => m.type === 'peek').length === 5,
+  `the cache is peeked only for the five long comments, not the short one (got ${sent.filter((m) => m.type === 'peek').length})`);
 
 (async () => {
-  const btn = btns[0];
-  const panel = doc.querySelectorAll('.gh-tldr-panel')[0];
-  assert(panel.hidden === true, 'panel starts hidden');
-  btn.click();
+  // Reopening a menu must not stack a second entry into it.
+  doc.getElementById('a-kebab').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 300));
+  assert(menuA.querySelectorAll('.gh-tldr-entry').length === 1, 'reopening the menu does not duplicate the entry');
+
+  // --- clicking the entry summarizes the right comment ---
+  const bodyA = doc.querySelector('#comment-a .js-comment-body');
+  const panelA = doc.querySelector('#comment-a .gh-tldr-panel');
+  assert(panelA && panelA.hidden === true, 'a hidden panel is prepared for each comment');
+
+  actionable(entryIn(menuA)).dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 30));
+
+  const tldrs = sent.filter((m) => m.type === 'tldr');
+  assert(tldrs.length === 1, 'one summary requested');
+  assert(tldrs[0].text.includes('deserves a summary'), "the clicked comment's text is what gets sent");
+  assert(panelA.hidden === false && panelA.querySelectorAll('.gh-tldr-list li').length === 2, 'summary renders in that comment\'s panel');
+  assert(doc.getElementById('a-details').open === false, 'the menu closes after choosing TLDR');
+
+  // Choosing it again toggles, without paying for a second summary.
+  actionable(entryIn(menuA)).dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
   await new Promise((r) => setTimeout(r, 20));
+  assert(panelA.hidden === true && sent.filter((m) => m.type === 'tldr').length === 1, 'choosing it again hides the panel, no second request');
 
-  const tldrs = () => sent.filter((m) => m.type === 'tldr');
-  assert(sent.filter((m) => m.type === 'peek').length === 6, 'cache peeked once per comment on attach');
-  assert(tldrs().length === 1, 'one tldr message sent to background');
-  assert(tldrs()[0].text.includes('deserves a summary'), 'comment text forwarded');
-  assert(panel.hidden === false, 'panel visible after summarizing');
-  assert(panel.querySelectorAll('.gh-tldr-list li').length === 2, 'bullets rendered as a list');
+  // Choosing TLDR on a short comment builds its panel on demand.
+  const shortBefore = sent.filter((m) => m.type === 'tldr').length;
+  actionable(doc.querySelector('#comment-short .gh-tldr-entry')).dispatchEvent(
+    new dom.window.MouseEvent('click', { bubbles: true })
+  );
+  await new Promise((r) => setTimeout(r, 30));
+  const shortPanel = doc.querySelector('#comment-short .gh-tldr-panel');
+  assert(shortPanel, 'the panel is created when the short comment is actually summarized');
+  assert(sent.filter((m) => m.type === 'tldr').length === shortBefore + 1, 'and the summary is requested');
 
-  btn.click();
-  await new Promise((r) => setTimeout(r, 10));
-  assert(panel.hidden === true && tldrs().length === 1, 'second click hides panel without a second API call');
-  btn.click();
-  await new Promise((r) => setTimeout(r, 10));
-  assert(panel.hidden === false && tldrs().length === 1, 'third click re-shows the cached summary');
+  // --- portalled menu: resolved through the trigger that opened it ---
+  const issueBody = doc.querySelector('[data-testid="markdown-body"]');
+  const portal = doc.createElement('div');
+  portal.innerHTML = `<ul role="menu" id="portal-menu">
+    ${actionListItem('Copy link')}
+    ${actionListItem('Quote reply', 'js-comment-quote-reply')}
+  </ul>`;
+  doc.getElementById('issue-kebab').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+  doc.body.appendChild(portal); // Primer renders the menu at the end of the document
+  await new Promise((r) => setTimeout(r, 300));
 
-  // error path
+  const portalEntry = portal.querySelector('.gh-tldr-entry');
+  assert(portalEntry, 'portalled menu gets an entry too — the hook is on a descendant, not the menuitem itself');
+  const quoteRow = portal.querySelector('.js-comment-quote-reply').closest('[role="menuitem"]');
+  assert(portalEntry.previousElementSibling === quoteRow, 'entry follows the Quote reply row in the portalled menu');
+  assert(portalEntry.querySelector('svg.gh-tldr-wand'), 'icon is included, because this menu uses icons');
+
+  // ActionList paints its hover on the content element inside the li, so that
+  // is where the styling class and the variant tag must land.
+  const portalItem = portalEntry.querySelector('.gh-tldr-menu-item');
+  assert(portalItem, 'ActionList entry has a styled element');
+  assert(portalItem !== portalEntry, 'which is the content element, not the cloned li');
+  assert(portalItem.className.includes('prc-ActionList-ActionListContent'),
+    'the styled element is the ActionList content element, matched by its hashed module name');
+  assert(portalItem.dataset.tldrMenu === 'actionlist',
+    `ActionList is tagged as such, so content.css can shape it (got ${portalItem.dataset.tldrMenu})`);
+  assert(portalEntry.tagName === 'LI' && portalEntry.classList.contains('gh-tldr-entry'),
+    'the li carries only the entry class, so it adds no second hover box');
+  assert(!portalEntry.classList.contains('gh-tldr-menu-item'), 'and is not itself styled as the item');
+
+  // The measured fit: this item has a 2px border, so the mesh is pulled out
+  // over it and covers the same box the item's background does.
+  const portalMesh = portalEntry.querySelector('.gh-tldr-mesh');
+  assert(portalMesh.style.inset === '-2px -2px -2px -2px',
+    `mesh is fitted to the border box, not the padding box (got ${JSON.stringify(portalMesh.style.inset)})`);
+
+  const portalWand = portalEntry.querySelector('svg.gh-tldr-wand');
+  assert(portalWand.closest('[class*="prc-ActionList-Visual"]'), 'wand stays in the visual slot');
+
+  const portalLabel = portalEntry.querySelector('.gh-tldr-label');
+  assert(portalLabel.className.includes('prc-ActionList-ItemLabel'),
+    "the label is GitHub's own label element, re-used rather than wrapped in another span");
+  assert(portalLabel.children.length === 0 && portalLabel.textContent === 'TLDR',
+    'no extra element is nested inside the label');
+
+  actionable(portalEntry).dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 30));
+  const last = sent.filter((m) => m.type === 'tldr').pop();
+  assert(last.text.includes('The issue description'), 'portalled entry summarizes the comment whose kebab was clicked');
+  assert(doc.querySelector('[data-testid="issue-body-viewer"] .gh-tldr-panel').hidden === false, 'issue panel opens');
+
+  // --- the entry must survive GitHub re-rendering the menu ---
+  // Menu contents arrive after the click and are then replaced wholesale, which
+  // threw the entry away: it flicked in and vanished. The trigger is replaced
+  // too, so the comment can no longer be resolved from it.
+  const rerenderMenu = portal.querySelector('#portal-menu');
+  const freshMarkup = `${actionListItem('Copy link')}${actionListItem('Quote reply', 'js-comment-quote-reply')}`;
+  rerenderMenu.innerHTML = freshMarkup; // React swaps the whole list
+  const oldKebab = doc.getElementById('issue-kebab');
+  const newKebab = oldKebab.cloneNode(true);
+  oldKebab.replaceWith(newKebab); // ...and the trigger with it
+  assert(!portal.querySelector('.gh-tldr-entry'), 'precondition: the re-render removed the entry');
+
+  await new Promise((r) => setTimeout(r, 400));
+  const readded = portal.querySelector('.gh-tldr-entry');
+  assert(readded, 'the entry is put back after the menu re-renders');
+  assert(readded.querySelector('.gh-tldr-menu-item').dataset.tldrMenu === 'actionlist',
+    'and is still shaped for the menu it rejoined');
+
+  // It is wired to the same comment's panel, which this test already
+  // summarized — so it toggles rather than paying for a second summary.
+  const issuePanel = doc.querySelector('[data-testid="issue-body-viewer"] .gh-tldr-panel');
+  const beforeRerenderClick = sent.filter((m) => m.type === 'tldr').length;
+  assert(issuePanel.hidden === false, 'precondition: that comment is already summarized and open');
+  actionable(readded).dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 30));
+  assert(issuePanel.hidden === true,
+    'the re-added entry still drives its own panel, though the trigger it was resolved from is gone');
+  assert(sent.filter((m) => m.type === 'tldr').length === beforeRerenderClick,
+    'and does not re-request a summary it already has');
+
+  // --- errors and cached summaries still work ---
   tldrReply = { error: 'No OpenAI API key set.' };
-  const btn2 = btns[1];
-  btn2.click();
-  await new Promise((r) => setTimeout(r, 20));
-  const p2 = doc.querySelectorAll('.gh-tldr-panel')[1];
-  assert(p2.className.includes('gh-tldr-error') && p2.textContent.includes('No OpenAI API key'), 'error surfaces in the panel');
-  assert(btn2.disabled === false, 'button re-enabled after failure');
+  const menuB = doc.querySelector('#b-details details-menu');
+  actionable(entryIn(menuB)).dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 30));
+  const panelB = doc.querySelector('#comment-b .gh-tldr-panel');
+  assert(panelB.className.includes('gh-tldr-error') && panelB.textContent.includes('No OpenAI API key'), 'errors surface in the panel');
 
-  // --- cached summaries appear without a click ---
-  peekReply = { summary: '- cached bullet one\n- cached bullet two', cached: true };
-  const before = sent.filter((m) => m.type === 'tldr').length;
+  peekReply = { summary: '- cached one\n- cached two', cached: true };
   const fresh = doc.createElement('div');
   fresh.className = 'js-comment-container';
-  fresh.innerHTML = '<div class="comment-body js-comment-body">' + long + '</div>';
+  fresh.innerHTML = `<div class="comment-body js-comment-body">${long} A previously summarized comment.</div>`;
   doc.body.appendChild(fresh);
-  await new Promise((r) => setTimeout(r, 500)); // MutationObserver debounce
-
-  const newPanel = fresh.querySelector('.gh-tldr-panel');
-  assert(newPanel && newPanel.hidden === false, 'cache hit opens the panel with no click');
-  assert(/cached bullet one/.test(newPanel.textContent), 'cached summary rendered');
-  assert(newPanel.querySelector('.gh-tldr-title').textContent === 'TLDR · cached', 'title marks it as cached');
-  assert(sent.filter((m) => m.type === 'tldr').length === before, 'cache hit costs no API call');
-
-  // A miss must leave the panel shut.
-  peekReply = {};
-  const fresh2 = doc.createElement('div');
-  fresh2.className = 'js-comment-container';
-  fresh2.innerHTML = '<div class="comment-body js-comment-body">' + long + ' edited since.</div>';
-  doc.body.appendChild(fresh2);
   await new Promise((r) => setTimeout(r, 500));
-  const missPanel = fresh2.querySelector('.gh-tldr-panel');
-  assert(missPanel && missPanel.hidden === true, 'cache miss (e.g. edited comment) leaves the panel closed');
+  const cachedPanel = fresh.querySelector('.gh-tldr-panel');
+  assert(cachedPanel && cachedPanel.hidden === false, 'a cached summary still opens with no interaction at all');
+  assert(cachedPanel.querySelector('.gh-tldr-title').textContent === 'TLDR · cached', 'and is labelled as cached');
 })();
