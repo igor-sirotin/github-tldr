@@ -34,6 +34,11 @@ JSDOM.fromURL(file, { runScripts: 'dangerously', resources: 'usable', pretendToB
       assert(labels[labels.indexOf('Quote reply') + 1] === 'TLDR', `TLDR follows Quote reply (${labels.join(' | ')})`);
     }
 
+    // Entries start at different points in the animation cycle.
+    const phases = [...doc.querySelectorAll('.gh-tldr-entry')].map((el) => el.style.getPropertyValue('--gh-tldr-phase'));
+    assert(phases.every((p) => /^-\d+(\.\d+)?s$/.test(p)), 'every entry carries a negative animation phase');
+    assert(new Set(phases).size > 1, 'and they are not all the same');
+
     // The legacy menu has no icons at all, so the entry adds none there either.
     const legacyEntry = doc.querySelector('details-menu:not(.ActionList) .gh-tldr-entry');
     assert(legacyEntry, 'legacy menu gets an entry');

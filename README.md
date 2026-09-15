@@ -117,6 +117,13 @@ Finding the right spot without knowing GitHub's class names:
   the label in an element of its own, that element is re-used rather than having
   another span nested inside it, and the icon's margin is dropped in ActionList,
   whose content element owns that gap.
+- **Give each entry its own phase.** `content.js` sets a random negative
+  `--gh-tldr-phase` per entry, which every animation in `content.css` takes as
+  its `animation-delay`. A negative delay starts an animation part-way through
+  its cycle and wraps on an infinite one, so a single range covers the label's
+  8s ramp and the blobs' 9–15s drifts. Without it every TLDR entry on a page
+  runs in lockstep, which reads as one synced pulse rather than as each item
+  having a life of its own.
 - **Re-colour, don't re-layout.** `content.css` sets no geometry on the entry at
   all — height, padding, font and icon gap are GitHub's. It only adds colour:
   the label carries an animated multi-hue ramp via `background-clip: text`, the

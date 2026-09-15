@@ -67,6 +67,9 @@ const PROCESSED = 'data-tldr-ready';
 // The cloned wrapper, used for dedupe; and the element GitHub actually hovers
 // and fills, which is what content.css styles.
 const ENTRY_CLASS = 'gh-tldr-entry';
+// Seconds. At least the longest animation in content.css, so every one of them
+// can start anywhere in its cycle.
+const PHASE_RANGE = 15;
 const MENU_ITEM_CLASS = 'gh-tldr-menu-item';
 // Only long comments are worth an up-front cache lookup. The menu entry itself
 // is offered whatever the length: it takes no space until the menu is opened,
@@ -305,6 +308,12 @@ function makeMenuItem(cell) {
 
   // Behind the label and icon, which content.css lifts above it with z-index.
   item.insertBefore(buildMesh(), item.firstChild);
+
+  // Start this entry part-way through its animations, so several on a page do
+  // not run in lockstep. A negative delay starts an animation mid-cycle, and on
+  // an infinite one it wraps, so this single range covers the label's 8s ramp
+  // and the blobs' 9-15s drifts alike. Inherited by both from the entry root.
+  entry.style.setProperty('--gh-tldr-phase', `-${(Math.random() * PHASE_RANGE).toFixed(2)}s`);
 
   return entry;
 }

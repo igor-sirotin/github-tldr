@@ -138,6 +138,16 @@ assert(actionable(entryA).dataset.tldrMenu === 'dropdown',
 const labelEl = entryA.querySelector('.gh-tldr-label');
 assert(labelEl && labelEl.textContent === 'TLDR', 'label is wrapped so the gradient has something to paint');
 
+// Each entry starts part-way through its animations, so a page of them does
+// not pulse in lockstep.
+const phase = entryA.style.getPropertyValue('--gh-tldr-phase');
+assert(/^-\d+(\.\d+)?s$/.test(phase), `entry carries a negative animation phase (got ${JSON.stringify(phase)})`);
+assert(parseFloat(phase) > -15.01 && parseFloat(phase) <= 0, 'phase is within the longest animation cycle');
+
+const phases = [...doc.querySelectorAll('.gh-tldr-entry')].map((el) => el.style.getPropertyValue('--gh-tldr-phase'));
+assert(phases.every((p) => p), 'every entry gets one');
+assert(new Set(phases).size > 1, `phases differ between entries (got ${phases.join(', ')})`);
+
 const mesh = actionable(entryA).querySelector('.gh-tldr-mesh');
 assert(mesh, 'hover mesh is built into the entry');
 assert(mesh.querySelectorAll('.gh-tldr-blob').length === 7, 'mesh has the seven blobs the design animates');

@@ -169,7 +169,7 @@
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
-    animation: gh-tldr-ramp 8s linear infinite;
+    animation: gh-tldr-ramp 8s linear var(--gh-tldr-phase, 0s) infinite;
   }
 }
 
@@ -232,44 +232,51 @@
 .gh-tldr-blob:nth-child(1) {
   left: 7%;
   background: radial-gradient(circle closest-side, var(--tldr-f1) 0%, var(--tldr-f1) 22%, transparent 78%);
-  animation: gh-tldr-blob-1 9s ease-in-out infinite alternate;
+  animation: gh-tldr-blob-1 9s ease-in-out var(--gh-tldr-phase, 0s) infinite alternate;
 }
 
 .gh-tldr-blob:nth-child(2) {
   left: 16%;
   background: radial-gradient(circle closest-side, var(--tldr-f2) 0%, var(--tldr-f2) 22%, transparent 78%);
-  animation: gh-tldr-blob-2 13s ease-in-out infinite alternate;
+  animation: gh-tldr-blob-2 13s ease-in-out var(--gh-tldr-phase, 0s) infinite alternate;
 }
 
 .gh-tldr-blob:nth-child(3) {
   left: 26%;
   background: radial-gradient(circle closest-side, var(--tldr-f3) 0%, var(--tldr-f3) 22%, transparent 78%);
-  animation: gh-tldr-blob-3 11s ease-in-out infinite alternate;
+  animation: gh-tldr-blob-3 11s ease-in-out var(--gh-tldr-phase, 0s) infinite alternate;
 }
 
 .gh-tldr-blob:nth-child(4) {
   left: 38%;
   background: radial-gradient(circle closest-side, var(--tldr-f4) 0%, var(--tldr-f4) 22%, transparent 78%);
-  animation: gh-tldr-blob-4 15s ease-in-out infinite alternate;
+  animation: gh-tldr-blob-4 15s ease-in-out var(--gh-tldr-phase, 0s) infinite alternate;
 }
 
 .gh-tldr-blob:nth-child(5) {
   left: 56%;
   background: radial-gradient(circle closest-side, var(--tldr-f5) 0%, var(--tldr-f5) 22%, transparent 78%);
-  animation: gh-tldr-blob-5 10s ease-in-out infinite alternate;
+  animation: gh-tldr-blob-5 10s ease-in-out var(--gh-tldr-phase, 0s) infinite alternate;
 }
 
 .gh-tldr-blob:nth-child(6) {
   left: 74%;
   background: radial-gradient(circle closest-side, var(--tldr-f6) 0%, var(--tldr-f6) 22%, transparent 78%);
-  animation: gh-tldr-blob-6 14s ease-in-out infinite alternate;
+  animation: gh-tldr-blob-6 14s ease-in-out var(--gh-tldr-phase, 0s) infinite alternate;
 }
 
 .gh-tldr-blob:nth-child(7) {
   left: 94%;
   background: radial-gradient(circle closest-side, var(--tldr-f7) 0%, var(--tldr-f7) 22%, transparent 78%);
-  animation: gh-tldr-blob-7 12s ease-in-out infinite alternate;
+  animation: gh-tldr-blob-7 12s ease-in-out var(--gh-tldr-phase, 0s) infinite alternate;
 }
+
+/* Every animation above takes `--gh-tldr-phase`, a negative delay content.js
+   sets per entry, which starts it part-way through its cycle. Without it every
+   TLDR entry on a page would run in lockstep, which reads as a single synced
+   pulse rather than as each item having a life of its own. A negative delay on
+   an infinite animation simply wraps, so one random range covers the label's 8s
+   ramp and the blobs' 9-15s drifts alike. */
 
 /* Paths are in percentages of the blob, so they scale with the item. Each
    duration is different, so the seven points keep recombining and never line
