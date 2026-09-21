@@ -387,6 +387,52 @@
   transform: translateY(1px);
 }
 
+/* The button on Markdown files (README, .md blob view). It is a clone of
+   GitHub's Outline button, so Primer gives it its height, padding, radius and
+   font; everything above re-colours it exactly as it does the menu entry —
+   gradient label, gradient wand, mesh fill on hover. Only what a standalone
+   button needs on top is set here. */
+.gh-tldr-menu-item[data-tldr-menu="button"] {
+  /* The gap to Outline, on its right. */
+  margin-right: var(--base-size-8, 8px);
+}
+
+.gh-tldr-doc-content {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.gh-tldr-menu-item[data-tldr-menu="button"] .gh-tldr-wand {
+  margin-right: 0;
+}
+
+/* A menu shows keyboard focus with its fill; a button needs its ring back. */
+.gh-tldr-menu-item[data-tldr-menu="button"]:focus-visible {
+  outline: 2px solid var(--focus-outlineColor, var(--fgColor-accent, #0969da));
+  outline-offset: -2px;
+}
+
+/* A click leaves a button focused, and the fill must not stay on after it. */
+.gh-tldr-menu-item[data-tldr-menu="button"]:focus:not(:focus-visible):not(:hover) .gh-tldr-mesh {
+  opacity: 0;
+}
+
+/* No Outline button to sit beside: a row of its own above the document, as
+   wide as the article (GitHub's .container-lg). */
+.gh-tldr-doc-bar {
+  display: flex;
+  justify-content: flex-end;
+  max-width: 1012px;
+  margin: 0 auto 16px;
+}
+
+.gh-tldr-doc-bar .gh-tldr-menu-item[data-tldr-menu="button"] {
+  margin-right: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .gh-tldr-menu-item .gh-tldr-label,
   .gh-tldr-blob {
@@ -406,6 +452,13 @@
   background: var(--bgColor-neutral-muted, #f6f8fa);
   font: 13px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
   color: var(--fgColor-default, #1f2328);
+}
+
+/* Above a document the panel lines up with the article, which GitHub centres
+   at .container-lg's width inside a padded wrapper. */
+.gh-tldr-panel[data-tldr-kind="document"] {
+  max-width: 1012px;
+  margin: 0 auto 24px;
 }
 
 .gh-tldr-panel::before {

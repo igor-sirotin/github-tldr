@@ -4,6 +4,10 @@ A small Chrome/Edge extension (Manifest V3) that adds a **TLDR** entry to the
 `···` menu on every GitHub comment, directly under *Quote reply*. Choose it and
 the comment is summarized into at most three bullets by the OpenAI API.
 
+Rendered Markdown files get the same treatment: a repository's README on its
+home page, and any `.md` file you open, carry a **TLDR** button in their header,
+just left of GitHub's *Outline* button.
+
 ## Install
 
 1. Open `chrome://extensions` and turn on **Developer mode**.
@@ -32,7 +36,8 @@ scripts on github.com.
   threads and the React issue views), adds a **TLDR** entry to each comment's
   `···` menu, and renders the result in a panel above the comment. A
   `MutationObserver` handles GitHub's client-side navigation and lazily loaded
-  comments.
+  comments. Rendered Markdown files get a **TLDR** button instead (see
+  [Markdown files](#markdown-files)).
 - `background.js` reads the settings and calls
   `POST {baseUrl}/chat/completions`, returning the summary to the content script.
 - Every comment is offered the entry regardless of length. Only the up-front
@@ -62,7 +67,7 @@ second request.
 | File | Purpose |
 | --- | --- |
 | `manifest.json` | MV3 manifest, `github.com` content script, `api.openai.com` host permission |
-| `content.js` | Menu entry, wand icon, panel rendering, cache peek |
+| `content.js` | Menu entry, README / Markdown file button, wand icon, panel rendering, cache peek |
 | `preview.html` | Standalone preview with working menus, no extension install needed |
 | `content.css` | Panel styles, themed with GitHub's CSS variables (works in dark mode) |
 | `background.js` | OpenAI request, summary cache |
@@ -79,7 +84,8 @@ xdg-open preview.html    # or just double-click it
 It loads the extension's real `content.css` and `content.js` and stubs only the
 extension APIs, so what you see is what ships. Open any `···` menu and **TLDR**
 is there under *Quote reply*. There are mock comments in three layouts — classic,
-a review thread, and the React issue view — plus a theme toggle. The stub fails
+a review thread, and the React issue view — plus a mock README with the
+**TLDR** button beside its Outline button, and a theme toggle. The stub fails
 every second call so the error state is reachable, and one comment is pre-seeded
 in the stub's cache so it opens on load without any interaction; press **Clear
 cache** to put it back.
@@ -176,6 +182,50 @@ trigger too, so the comment whose menu was last opened is remembered; any live
 trigger still wins over that memory, so another comment's menu cannot inherit a
 stale one.
 
+## Markdown files
+
+A README on a repository's home page and a `.md` file opened in the file view
+both render as `<article class="markdown-body">`, which comments never use.
+Neither has a `···` menu, so they get a button instead, with the same design as
+the menu entry: gradient wand, animated gradient label, mesh fill on hover.
+
+- **Placed beside Outline.** Both views put GitHub's *Outline* (table of
+  contents) button in the document's header: at the end of the README tab row
+  on the home page, and after *Raw* / copy / download in the file view. The
+  TLDR button goes directly to its left. Outline is recognised by its
+  `octicon-list-unordered` glyph, not its label, so a translated UI still
+  matches. On github.com it is 2 levels above the article on the home page and
+  4 in the file view; the search climbs at most 6, so a page without one cannot
+  reach some unrelated list icon further out.
+- **Cloned, like the menu entry.** The button is a shallow clone of the Outline
+  button, keeping Primer's base class and its `data-size` / `data-variant`, so
+  GitHub gives it its height, radius, font and hover chrome — medium in the
+  README header, small in the file header. What made Outline an icon-only
+  square (`IconButton`), its `-module__` layout classes, its `tmp-m*` margin,
+  ids, ARIA wiring and glyph are dropped. It carries the same
+  `gh-tldr-menu-item` class as the menu entry, tagged `data-tldr-menu="button"`,
+  so every colour rule applies unchanged; `content.css` only adds the gap to
+  Outline, a focus ring (a menu shows focus with its fill, a button needs a
+  ring), and keeps the fill from staying on after a mouse click leaves the
+  button focused.
+- **Fallback row.** With no Outline button to sit beside, the button gets a
+  right-aligned row of its own above the document, styled by GitHub's global
+  `.btn .btn-sm`.
+- **Panel above the article.** The summary panel sits directly above the
+  article, centred to the article's own width (`.container-lg`, 1012px).
+- **Follows navigation.** GitHub keeps the header while swapping the article
+  underneath — switching README tabs, moving between `.md` files — so the
+  button is rebound to the new document rather than rebuilt, and the old
+  document's panel is dropped. When no document is left (a code file, or the
+  *Code* view instead of *Preview*) the button is removed with its panel.
+- **A prompt of its own.** Documents are sent with `kind: 'document'` and
+  summarized with a prompt that asks what the project or document is for and
+  what matters to someone about to use it, rather than what a comment asks of
+  the reader. The kind is part of the cache key, so the same text read as a
+  comment and as a document never share an entry; comment keys are unchanged,
+  so existing cached summaries still hit. Only the first 12k characters of a
+  long README are sent.
+
 ## Which comment
 
 A pull request review thread nests all of its replies inside a single
@@ -211,12 +261,15 @@ never fails the summary. The options page shows the entry count and clears it.
 ## Tests
 
 Two small Node harnesses run the real source files against a fake `chrome` API —
-`content.test.js` drives a simulated GitHub DOM (jsdom), `background.test.js`
-stubs `fetch` and checks request shaping and error handling.
+`content.test.js` drives a simulated GitHub DOM (jsdom), `document.test.js`
+does the same for README and Markdown file pages (markup trimmed from fetched
+github.com pages), `background.test.js` stubs `fetch` and checks request shaping
+and error handling.
 
 ```sh
 npm install jsdom      # only dependency, only needed for the DOM test
 node test/content.test.js
+node test/document.test.js
 node test/background.test.js
 node test/preview.test.js
 ```
