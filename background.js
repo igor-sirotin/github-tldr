@@ -12,6 +12,19 @@ const SYSTEM_PROMPT =
   'no code fences. Keep names, numbers and decisions; drop pleasantries. ' +
   'If the comment asks for something or blocks progress, say so explicitly.';
 
+// A README or other Markdown file is a different read: nobody is asking the
+// reader for anything, they want to know what it is and whether it concerns them.
+const DOCUMENT_PROMPT =
+  'You summarize a Markdown document from a GitHub repository (often its README) for a ' +
+  'busy developer. Reply with a TLDR of at most 3 short bullet points, each starting with ' +
+  '"- ". No preamble, no markdown headings, no code fences. Say what the project or ' +
+  'document is for, then what matters most to someone about to use or change it: key ' +
+  'requirements, commands, versions or caveats. Drop badges, links and boilerplate.';
+
+function promptFor(kind) {
+  return kind === 'document' ? DOCUMENT_PROMPT : SYSTEM_PROMPT;
+}
+
 const MAX_CHARS = 12000; // keep requests cheap; comments are rarely longer
 const MAX_OUTPUT_TOKENS = 500; // a 3-bullet TLDR, with headroom for reasoning tokens
 
@@ -26,12 +39,12 @@ function markUnsupported(model, param) {
   unsupported.get(model).add(param);
 }
 
-function buildBody(model, text) {
+function buildBody(model, text, kind) {
   const skip = unsupported.get(model) || new Set();
   const body = {
     model,
     messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'system', content: promptFor(kind) },
       { role: 'user', content: sentText(text) },
     ],
   };
@@ -76,6 +89,13 @@ function sentText(text) {
   return text.slice(0, MAX_CHARS);
 }
 
+// The same text summarized as a document goes through a different prompt, so
+// it must not share a cache entry with the comment reading. Comments keep the
+// bare text, so their existing entries still hit.
+function keyedText(text, kind) {
+  return kind === 'document' ? `document\n${sentText(text)}` : sentText(text);
+}
+
 async function readCache() {
   const stored = await chrome.storage.local.get(CACHE_KEY);
   const cache = stored[CACHE_KEY];
@@ -103,10 +123,10 @@ function writeCache(key, summary) {
 
 // Look up without ever calling the API — this runs for every comment on the
 // page, so it must stay free.
-async function peek(text) {
+async function peek(text, kind) {
   const { openaiModel } = await getSettings();
   const cache = await readCache();
-  const hit = cache[cacheKey(openaiModel, sentText(text))];
+  const hit = cache[cacheKey(openaiModel, keyedText(text, kind))];
   return hit ? hit.summary : null;
 }
 
@@ -115,13 +135,13 @@ async function getSettings() {
   return { ...DEFAULTS, ...stored };
 }
 
-async function tldr(text) {
+async function tldr(text, kind) {
   const { openaiKey, openaiModel, openaiBaseUrl } = await getSettings();
   if (!openaiKey) {
     throw new Error('No OpenAI API key set. Open the extension options and add one.');
   }
 
-  const key = cacheKey(openaiModel, sentText(text));
+  const key = cacheKey(openaiModel, keyedText(text, kind));
   const cache = await readCache();
   if (cache[key]) return cache[key].summary;
 
@@ -137,7 +157,7 @@ async function tldr(text) {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${openaiKey}`,
       },
-      body: JSON.stringify(buildBody(openaiModel, text)),
+      body: JSON.stringify(buildBody(openaiModel, text, kind)),
     });
 
     data = await res.json().catch(() => null);
@@ -173,14 +193,14 @@ async function tldr(text) {
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.type === 'peek') {
-    peek(msg.text)
+    peek(msg.text, msg.kind)
       .then((summary) => sendResponse(summary ? { summary, cached: true } : {}))
       .catch(() => sendResponse({}));
     return true;
   }
 
   if (msg?.type !== 'tldr') return;
-  tldr(msg.text)
+  tldr(msg.text, msg.kind)
     .then((summary) => sendResponse({ summary }))
     .catch((err) => sendResponse({ error: err.message }));
   return true; // keep the message channel open for the async reply

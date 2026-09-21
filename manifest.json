@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "GitHub TLDR",
-  "version": "1.4.0",
-  "description": "Adds a TLDR entry to the GitHub comment menu and summarizes the comment with OpenAI.",
+  "version": "1.5.0",
+  "description": "Adds a TLDR entry to the GitHub comment menu, and a TLDR button to READMEs and Markdown files, summarized with OpenAI.",
   "permissions": ["storage"],
   "host_permissions": ["https://api.openai.com/*"],
   "background": { "service_worker": "background.js" },

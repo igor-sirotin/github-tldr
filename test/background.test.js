@@ -97,6 +97,30 @@ const call = (text) => new Promise((res) => { listener({ type: 'tldr', text }, {
   assert(!p.summary, 'switching model misses the cache rather than reusing another model output');
   delete store.openaiModel;
 
+  // --- documents: README and other Markdown files ---
+  const doc = (type, text) => new Promise((res) => { listener({ type, text, kind: 'document' }, {}, res); });
+
+  p = await doc('peek', COMMENT);
+  assert(!p.summary, 'the same text read as a document misses the comment\'s cache entry');
+
+  reqLog = [];
+  nextRes = { ok: true, json: () => Promise.resolve({ choices: [{ message: { content: '- a doc' } }] }) };
+  r = await doc('tldr', COMMENT);
+  assert(r.summary === '- a doc' && reqLog.length === 1, 'a document summary hits the API');
+  const docSystem = reqLog[0].body.messages[0].content;
+  assert(/Markdown document/.test(docSystem) && /README/.test(docSystem), 'documents get the document prompt');
+  assert(reqLog[0].body.messages[1].content === COMMENT, 'and the text itself is sent unchanged');
+
+  p = await doc('peek', COMMENT);
+  assert(p.summary === '- a doc', 'the document summary is cached under its own key');
+  p = await peek(COMMENT);
+  assert(p.summary === '- one\n- two', 'and the comment summary of the same text is untouched');
+
+  reqLog = [];
+  nextRes = { ok: true, json: () => Promise.resolve({ choices: [{ message: { content: '- c' } }] }) };
+  await call('A comment, not a document.');
+  assert(/GitHub comments/.test(reqLog[0].body.messages[0].content), 'comments still get the comment prompt');
+
   // Eviction keeps the store bounded.
   const big = {};
   for (let i = 0; i < 205; i += 1) big['k' + i] = { summary: 's', at: i };

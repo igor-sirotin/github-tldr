@@ -123,6 +123,24 @@ JSDOM.fromURL(file, { runScripts: 'dangerously', resources: 'usable', pretendToB
     assert(second.closest('.timeline-comment').querySelector('.gh-tldr-panel').className.includes('gh-tldr-error'),
       'second choice reaches the error state');
 
+    // The README has no menu: it gets a button beside Outline instead.
+    const readme = doc.getElementById('readme');
+    const docButtons = doc.querySelectorAll('.gh-tldr-doc-button');
+    assert(docButtons.length === 1 && readme.contains(docButtons[0]), 'the README mock gets exactly one TLDR button');
+    const docButton = docButtons[0];
+    assert(docButton.nextElementSibling.getAttribute('aria-label') === 'Outline', 'left of the Outline button');
+    assert(docButton.classList.contains('prc-Button-ButtonBase-demo'), 'cloned from it, so it has its geometry');
+    assert(docButton.querySelectorAll('.gh-tldr-blob').length === 7 && docButton.querySelector('.gh-tldr-label'),
+      'with the menu entry design: gradient label and mesh fill');
+    assert(dom.window.getComputedStyle(docButton.querySelector('.gh-tldr-mesh')).opacity === '0',
+      'the fill is hidden at rest');
+    click(docButton);
+    await new Promise((r) => setTimeout(r, 1100));
+    const readmePanel = readme.querySelector('.gh-tldr-panel');
+    assert(readmePanel && readmePanel.hidden === false && readmePanel.querySelectorAll('.gh-tldr-list li').length === 3,
+      'clicking it summarizes the README into a panel above it');
+    assert(readmePanel.nextElementSibling.matches('article.markdown-body'), 'directly above the article');
+
     doc.getElementById('theme').click();
     assert(doc.documentElement.dataset.previewTheme === 'dark', 'theme toggle works');
     doc.getElementById('clear').click();

@@ -1,4 +1,5 @@
-// GitHub TLDR - adds a "TLDR" entry to the ... menu on every GitHub comment.
+// GitHub TLDR - adds a "TLDR" entry to the ... menu on every GitHub comment,
+// and a TLDR button to rendered Markdown files such as a repository's README.
 
 const BODY_SELECTORS = [
   '.js-comment-body',
@@ -42,6 +43,18 @@ const CONTENT_SELECTORS = [
 
 // Containers we must not climb out of when looking for the entry's outer cell.
 const MENU_SELECTORS = ['details-menu', '[role="menu"]', '.dropdown-menu', 'action-menu'];
+
+// A rendered Markdown file: the README on a repository's home page, and any .md
+// opened in the file view. Both render as this <article>, which comments never
+// use, and neither has a ... menu to join, so they get a button instead.
+const DOCUMENT_SELECTOR = 'article.markdown-body';
+// That button goes just left of GitHub's own Outline button, which both views
+// put in the document's header. It is recognised by its glyph, not its label,
+// which a non-English UI translates.
+const OUTLINE_ICON = 'svg.octicon-list-unordered';
+const DOC_BUTTON_CLASS = 'gh-tldr-doc-button';
+// Where there is no Outline to sit beside, the button gets a row of its own.
+const DOC_BAR_CLASS = 'gh-tldr-doc-bar';
 
 // Lucide "wand-sparkles" (https://lucide.dev/icons/wand-sparkles), ISC licensed.
 // Built as nodes rather than an innerHTML string; sized by .gh-tldr-wand in CSS.
@@ -414,6 +427,11 @@ function setState(panel, cls, text) {
   panel.textContent = text;
 }
 
+// Documents are summarized with a prompt of their own; see background.js.
+function kindOf(body) {
+  return body.matches(DOCUMENT_SELECTOR) ? 'document' : 'comment';
+}
+
 async function summarize(panel, body) {
   const text = textOf(body);
   if (!text) {
@@ -424,7 +442,7 @@ async function summarize(panel, body) {
   setState(panel, 'gh-tldr-loading', 'Summarizing…');
 
   try {
-    const res = await chrome.runtime.sendMessage({ type: 'tldr', text });
+    const res = await chrome.runtime.sendMessage({ type: 'tldr', text, kind: kindOf(body) });
     if (!res) throw new Error('No response from extension background.');
     if (res.error) throw new Error(res.error);
     panel.hidden = false;
@@ -446,6 +464,8 @@ function panelFor(body) {
   if (existing) return existing;
 
   const panel = makePanel();
+  // An attribute, not a class: every state change rewrites the class list.
+  panel.dataset.tldrKind = kindOf(body);
   body.parentElement.insertBefore(panel, body);
   panels.set(body, panel);
   return panel;
@@ -463,13 +483,15 @@ function attach(body) {
   // A miss (including an edited comment, whose text now hashes differently)
   // leaves the panel closed and costs nothing.
   chrome.runtime
-    .sendMessage({ type: 'peek', text: textOf(body) })
+    .sendMessage({ type: 'peek', text: textOf(body), kind: kindOf(body) })
     .then((res) => {
       if (!res || !res.summary || panel.dataset.loaded === '1') return;
       panel.hidden = false;
       panel.className = 'gh-tldr-panel';
       renderSummary(panel, res.summary, { cached: true });
       panel.dataset.loaded = '1';
+      const btn = buttonOfDoc.get(body);
+      if (btn) btn.setAttribute('aria-expanded', 'true');
     })
     .catch(() => {}); // no background worker (or no cache) is not an error
 }
@@ -505,6 +527,18 @@ function commentForMenu(item) {
   return found;
 }
 
+// Summarize on first use, and after that only show or hide what is there.
+function openSummary(body) {
+  // Built here rather than up front, so a comment nobody summarizes costs no
+  // DOM at all.
+  const panel = panelFor(body);
+  if (panel.dataset.loaded === '1') {
+    panel.hidden = !panel.hidden;
+    return;
+  }
+  summarize(panel, body);
+}
+
 function addMenuEntry(quote) {
   const cell = outerCell(quote);
   const next = cell.nextElementSibling;
@@ -520,14 +554,7 @@ function addMenuEntry(quote) {
     e.preventDefault();
     e.stopPropagation();
     closeMenu(item);
-    // Built here rather than up front, so a comment nobody summarizes costs
-    // no DOM at all.
-    const panel = panelFor(body);
-    if (panel.dataset.loaded === '1') {
-      panel.hidden = !panel.hidden;
-      return;
-    }
-    summarize(panel, body);
+    openSummary(body);
   });
 
   cell.insertAdjacentElement('afterend', item);
@@ -536,6 +563,163 @@ function addMenuEntry(quote) {
   const styled = item.querySelector('.' + MENU_ITEM_CLASS) || item;
   const mesh = styled.querySelector('.gh-tldr-mesh');
   if (mesh) fitMesh(styled, mesh);
+}
+
+// --- Markdown files ---
+
+// Which document each button summarizes, and the reverse. A button outlives the
+// article it was made for: GitHub keeps the header while swapping the article
+// underneath (README tabs, moving between .md files), so it is rebound rather
+// than rebuilt.
+const docOfButton = new WeakMap();
+const buttonOfDoc = new WeakMap();
+
+// Rendered Markdown that is a file, not a comment.
+function documentsIn(root) {
+  return [...root.querySelectorAll(DOCUMENT_SELECTOR)].filter(
+    (el) => !el.parentElement.closest([...BODY_SELECTORS, '.js-comment-container'].join(','))
+  );
+}
+
+// The nearest Outline button above the document. Climbing stops at the first
+// ancestor that has one, so the button joins this document's header and no
+// other. The document's own content is never searched. On github.com the
+// Outline is 2 levels up on a repository's home page and 4 in the file view;
+// the cap keeps a page without one from reaching some unrelated list icon
+// further out.
+const OUTLINE_MAX_DEPTH = 6;
+
+function outlineButtonFor(doc) {
+  let depth = 0;
+  for (
+    let node = doc.parentElement;
+    node && node !== document.body && depth < OUTLINE_MAX_DEPTH;
+    node = node.parentElement, depth += 1
+  ) {
+    for (const icon of node.querySelectorAll(OUTLINE_ICON)) {
+      const btn = icon.closest('button');
+      if (btn && !btn.closest(DOCUMENT_SELECTOR) && !btn.classList.contains(DOC_BUTTON_CLASS)) return btn;
+    }
+  }
+  return null;
+}
+
+// Same approach as the menu entry: be one of GitHub's own buttons. A shallow
+// clone of the Outline button keeps Primer's base class and its data-size and
+// data-variant, which carry the height, radius, font and hover chrome, and
+// drops the glyph. What made it an icon-only square, and anything tying it to
+// Outline's behaviour or layout, is stripped. The colour is the menu entry's.
+function makeDocButton(template) {
+  let btn;
+  if (template) {
+    btn = template.cloneNode(false);
+    for (const attr of [
+      'id', 'title', 'aria-label', 'aria-labelledby', 'aria-describedby', 'aria-haspopup',
+      'aria-expanded', 'aria-pressed', 'data-testid', 'data-component', 'data-no-visuals',
+      'tabindex', 'style',
+    ]) {
+      btn.removeAttribute(attr);
+    }
+    for (const cls of [...btn.classList]) {
+      // IconButton fixes the width to a square; -module__ classes place and
+      // colour Outline specifically; tmp-m* is Outline's own margin.
+      if (/IconButton|-module__|^js-|^tmp-m/.test(cls)) btn.classList.remove(cls);
+    }
+  } else {
+    // No Primer button to copy: GitHub's global .btn still styles one.
+    btn = document.createElement('button');
+    btn.className = 'btn btn-sm';
+  }
+  btn.type = 'button';
+  btn.classList.add(MENU_ITEM_CLASS, DOC_BUTTON_CLASS);
+  btn.dataset.tldrMenu = 'button';
+  btn.title = 'Summarize this document with AI';
+  btn.setAttribute('aria-expanded', 'false');
+
+  const content = document.createElement('span');
+  content.className = 'gh-tldr-doc-content';
+  const wand = wandIcon();
+  wand.setAttribute('width', '16');
+  wand.setAttribute('height', '16');
+  const label = document.createElement('span');
+  label.className = 'gh-tldr-label';
+  label.textContent = 'TLDR';
+  content.append(wand, label);
+
+  btn.append(buildMesh(), content);
+  btn.style.setProperty('--gh-tldr-phase', `-${(Math.random() * PHASE_RANGE).toFixed(2)}s`);
+
+  btn.addEventListener('click', (e) => {
+    e.preventDefault();
+    const doc = docOfButton.get(btn);
+    if (!doc || !doc.isConnected) return;
+    openSummary(doc);
+    btn.setAttribute('aria-expanded', String(!panelFor(doc).hidden));
+  });
+  return btn;
+}
+
+// Point a button at a document, dropping the panel of whatever it summarized
+// before if that document has since left the page.
+function bindDocButton(btn, doc) {
+  const previous = docOfButton.get(btn);
+  if (previous && previous !== doc && !previous.isConnected) {
+    const stale = panels.get(previous);
+    if (stale) stale.remove();
+  }
+  docOfButton.set(btn, doc);
+  buttonOfDoc.set(doc, btn);
+  const panel = panels.get(doc);
+  btn.setAttribute('aria-expanded', String(!!panel && !panel.hidden));
+}
+
+function placeDocButton(doc) {
+  const outline = outlineButtonFor(doc);
+  let btn;
+  if (outline) {
+    const prev = outline.previousElementSibling;
+    btn = prev && prev.classList.contains(DOC_BUTTON_CLASS) ? prev : null;
+    if (!btn) {
+      btn = makeDocButton(outline);
+      outline.insertAdjacentElement('beforebegin', btn);
+    }
+  } else {
+    const bar = document.createElement('div');
+    bar.className = DOC_BAR_CLASS;
+    btn = makeDocButton(null);
+    bar.appendChild(btn);
+    // Above the panel too, which panelFor() also puts directly before the doc.
+    const panel = panels.get(doc);
+    doc.parentElement.insertBefore(bar, panel || doc);
+  }
+  bindDocButton(btn, doc);
+
+  const mesh = btn.querySelector('.gh-tldr-mesh');
+  if (mesh) fitMesh(btn, mesh);
+}
+
+function removeDocButton(btn) {
+  const doc = docOfButton.get(btn);
+  const panel = doc && panels.get(doc);
+  if (panel) panel.remove();
+  const bar = btn.parentElement;
+  if (bar && bar.classList.contains(DOC_BAR_CLASS)) bar.remove();
+  else btn.remove();
+}
+
+function scanDocuments() {
+  for (const doc of documentsIn(document)) {
+    const btn = buttonOfDoc.get(doc);
+    if (btn && btn.isConnected && docOfButton.get(btn) === doc) continue;
+    attach(doc);
+    placeDocButton(doc);
+  }
+  // A button whose document has gone -- a code file opened, or the Code view
+  // chosen over Preview -- goes with it.
+  for (const btn of document.querySelectorAll('.' + DOC_BUTTON_CLASS)) {
+    const doc = docOfButton.get(btn);
+    if (!doc || !doc.isConnected) removeDocButton(btn);
+  }
 }
 
 // Menus are cheap to re-check and are re-rendered on every open, so this runs
@@ -553,6 +737,7 @@ function scan() {
   for (const sel of BODY_SELECTORS) {
     for (const body of document.querySelectorAll(sel)) attach(body);
   }
+  scanDocuments();
   scanMenus();
 }
 

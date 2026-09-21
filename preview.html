@@ -2,7 +2,7 @@
 <html lang="en" data-preview-theme="light">
 <head>
 <meta charset="utf-8">
-<title>GitHub TLDR — menu entry preview</title>
+<title>GitHub TLDR — preview</title>
 <!-- The real extension stylesheet. Nothing here is loaded by the extension itself. -->
 <link rel="stylesheet" href="content.css">
 <style>
@@ -169,6 +169,40 @@
   .tldr-fill-demo.is-paused .gh-tldr-blob { animation-play-state: paused; }
   .states .legend { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 20px; margin: 12px 0 0; padding: 0; list-style: none; font-size: 12px; color: var(--fgColor-muted); }
   .states .legend b { color: var(--fgColor-default); font-weight: 500; }
+
+  /* A repository's README, as the home page lays it out: a header row of tabs
+     with the Outline button at its end, then the article in a padded wrapper.
+     The Outline button stands in for Primer's invisible medium Button — the
+     TLDR button is cloned from it, so this is the geometry it inherits. */
+  .readme-box { background: var(--bgColor-default); border: 1px solid var(--borderColor-default); border-radius: 6px; }
+  .readme-header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 4px 8px 4px 16px;
+    border-bottom: 1px solid var(--borderColor-default);
+  }
+  .readme-header nav { display: flex; gap: 16px; margin-right: auto; font-size: 14px; }
+  .readme-header nav span { padding: 8px 0; color: var(--fgColor-muted); }
+  .readme-header nav span.is-selected { color: var(--fgColor-default); font-weight: 600; box-shadow: inset 0 -2px 0 #fd8c73; }
+  .prc-Button-ButtonBase-demo {
+    display: inline-flex; align-items: center; justify-content: center;
+    height: 32px; padding: 0 12px;
+    border: 1px solid transparent; border-radius: 6px;
+    background: transparent; color: var(--fgColor-default);
+    font: 500 14px/20px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    cursor: pointer;
+  }
+  .prc-Button-ButtonBase-demo:hover { background: var(--bgColor-neutral-muted); }
+  .OverviewRepoFiles-module__ActionMenu_Button__demo { color: var(--fgColor-muted); padding: 0 8px; }
+  .prc-Button-ButtonBase-demo svg { fill: currentColor; }
+  .readme-wrap { padding: 32px; }
+  .readme-wrap .markdown-body { max-width: 1012px; margin: 0 auto; }
+  .readme-wrap .markdown-body h1 { margin: 0 0 16px; padding-bottom: 8px; font-size: 28px; border-bottom: 1px solid var(--borderColor-default); }
+  .readme-wrap .markdown-body h2 { margin: 24px 0 12px; font-size: 20px; }
+  .readme-wrap .markdown-body p { margin: 0 0 12px; }
+  .readme-wrap .markdown-body code {
+    font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    background: var(--bgColor-neutral-muted); border-radius: 4px; padding: 1px 5px;
+  }
 </style>
 </head>
 <body>
@@ -176,7 +210,7 @@
   <div class="bar">
     <div>
       <h1>GitHub TLDR — local preview</h1>
-      <p>Runs the real <code>content.js</code> and <code>content.css</code> against fake comments. Open any <code>···</code> menu: <strong>TLDR</strong> sits under <em>Quote reply</em>, in both of GitHub's menu systems. No extension install, no API key.</p>
+      <p>Runs the real <code>content.js</code> and <code>content.css</code> against fake comments. Open any <code>···</code> menu: <strong>TLDR</strong> sits under <em>Quote reply</em>, in both of GitHub's menu systems, and the README at the bottom gets a <strong>TLDR</strong> button beside Outline. No extension install, no API key.</p>
     </div>
     <span class="spacer"></span>
     <button type="button" id="clear">Clear cache</button>
@@ -332,6 +366,30 @@
       </div>
     </div>
   </div>
+
+  <!-- A repository's README. There is no ... menu here, so the TLDR button
+       joins the header, just left of GitHub's Outline button. The same happens
+       for any .md file opened in the file view. -->
+  <div class="readme-box" id="readme">
+    <div class="readme-header">
+      <nav aria-label="Repository files"><span class="is-selected">README</span><span>MIT license</span></nav>
+      <button type="button" aria-label="Outline" aria-haspopup="true" class="prc-Button-ButtonBase-demo OverviewRepoFiles-module__ActionMenu_Button__demo" data-size="medium" data-variant="invisible"><svg class="octicon octicon-list-unordered" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M5.75 2.5h8.5a.75.75 0 0 1 0 1.5h-8.5a.75.75 0 0 1 0-1.5Zm0 5h8.5a.75.75 0 0 1 0 1.5h-8.5a.75.75 0 0 1 0-1.5Zm0 5h8.5a.75.75 0 0 1 0 1.5h-8.5a.75.75 0 0 1 0-1.5ZM2 14a1 1 0 1 1 0-2 1 1 0 0 1 0 2Zm1-6a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM2 4a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"></path></svg></button>
+    </div>
+    <div class="readme-wrap">
+      <article class="markdown-body entry-content container-lg" itemprop="text">
+        <h1>design-tokens</h1>
+        <p>Shared colour, spacing and type tokens for the web and iOS apps, generated from a single
+        JSON source so both platforms stay in sync. The build emits CSS custom properties, a Swift
+        package and a TypeScript module.</p>
+        <h2>Install</h2>
+        <p>Run <code>pnpm add @acme/design-tokens</code>, or add the Swift package from this
+        repository's <code>ios/</code> folder. Node 22 or later is required to build from source.</p>
+        <h2>Contributing</h2>
+        <p>Edit <code>tokens.json</code> only; everything else is generated. Run <code>pnpm build</code>
+        before opening a pull request, and never hand-edit the generated files.</p>
+      </article>
+    </div>
+  </div>
 </div>
 
 <!-- One menu definition, cloned into every slot. Items carry octicons, as they
@@ -395,6 +453,13 @@
     '- Preferred fix: split Design into tokens and components targets to remove the fan-out before the iOS app lands.',
   ].join('\n');
 
+  // What the README mock summarizes to; the stub answers documents with this.
+  const DOC_CANNED = [
+    '- design-tokens generates shared colour, spacing and type tokens for web and iOS from one JSON source.',
+    '- Install with pnpm add @acme/design-tokens, or the Swift package in ios/; building needs Node 22+.',
+    '- Edit only tokens.json and run pnpm build before a PR — generated files are never hand-edited.',
+  ].join('\n');
+
   const PRESEEDED = [
     '- Already summarized earlier, so this panel opened on page load rather than on a click.',
     '- The cache key is a hash of the model and the comment text, which doubles as the version check.',
@@ -420,8 +485,9 @@
           const fail = ++call % 2 === 0; // every second click shows the error state
           setTimeout(() => {
             if (fail) return resolve({ error: 'OpenAI API key is not set.' });
-            cache.set(key, CANNED);
-            resolve({ summary: CANNED });
+            const summary = msg.kind === 'document' ? DOC_CANNED : CANNED;
+            cache.set(key, summary);
+            resolve({ summary });
           }, 900);
         }),
     },
